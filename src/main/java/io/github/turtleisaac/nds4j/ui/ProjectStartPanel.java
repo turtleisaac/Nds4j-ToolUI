@@ -55,8 +55,7 @@ public class ProjectStartPanel extends JPanel {
     }
 
     private void openProjectButtonPressed(ActionEvent e) {
-        String projectPath = Tool.selectProject();
-        NintendoDsRom rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        String projectPath = tool.selectAndValidateProject(this);
         prepareForToolWindowStart(projectPath);
     }
 

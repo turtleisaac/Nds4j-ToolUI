@@ -56,7 +56,8 @@ public class ProjectStartPanel extends JPanel {
 
     private void openProjectButtonPressed(ActionEvent e) {
         String projectPath = tool.selectAndValidateProject(this);
-        prepareForToolWindowStart(projectPath);
+        if (projectPath != null)
+            prepareForToolWindowStart(projectPath);
     }
 
     private void prepareForToolWindowStart(String projectPath)

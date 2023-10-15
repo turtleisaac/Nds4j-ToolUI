@@ -1,0 +1,122 @@
+JFDML JFormDesigner: "8.0.5.0.268" Java: "17.0.8" encoding: "UTF-8"
+
+new FormModel {
+	"i18n.bundleName": "project_gui"
+	"i18n.autoExternalize": true
+	"i18n.keyPrefix": "ProjectCreateDialog"
+	contentType: "form/swing"
+	root: new FormRoot {
+		add( new FormWindow( "javax.swing.JDialog", new FormLayoutManager( class java.awt.BorderLayout ) ) {
+			name: "this"
+			"title": new FormMessage( null, "ProjectCreateDialog.this.title" )
+			add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class java.awt.BorderLayout ) ) {
+				name: "dialogPane"
+				add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
+					"$layoutConstraints": "insets dialog,hidemode 3"
+					"$columnConstraints": "[fill][grow,fill][fill]"
+					"$rowConstraints": "[][][][][]"
+				} ) {
+					name: "contentPanel"
+					add( new FormComponent( "javax.swing.JLabel" ) {
+						name: "projectNameLabel"
+						"text": new FormMessage( null, "ProjectCreateDialog.projectNameLabel.text" )
+						"labelFor": new FormReference( "projectNameField" )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 0 0"
+					} )
+					add( new FormComponent( "javax.swing.JTextField" ) {
+						name: "projectNameField"
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 1 0"
+					} )
+					add( new FormComponent( "javax.swing.JLabel" ) {
+						name: "parentFolderLabel"
+						"text": new FormMessage( null, "ProjectCreateDialog.parentFolderLabel.text" )
+						"labelFor": new FormReference( "parentFolderField" )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 0 2"
+					} )
+					add( new FormComponent( "javax.swing.JTextField" ) {
+						name: "parentFolderField"
+						"editable": false
+						"enabled": false
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 1 2,grow"
+					} )
+					add( new FormComponent( "javax.swing.JButton" ) {
+						name: "parentFolderButton"
+						"icon": new com.jformdesigner.model.SwingIcon( 2, "FileView.directoryIcon" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "parentFolderButtonPressed", true ) )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 2 2"
+					} )
+					add( new FormComponent( "javax.swing.JLabel" ) {
+						name: "baseRomLabel"
+						"text": new FormMessage( null, "ProjectCreateDialog.baseRomLabel.text" )
+						"labelFor": new FormReference( "baseRomField" )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 0 3"
+					} )
+					add( new FormComponent( "javax.swing.JTextField" ) {
+						name: "baseRomField"
+						"editable": false
+						"enabled": false
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 1 3,grow"
+					} )
+					add( new FormComponent( "javax.swing.JButton" ) {
+						name: "baseRomButton"
+						"icon": new com.jformdesigner.model.SwingIcon( 2, "FileView.fileIcon" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "baseRomButtonPressed", true ) )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 2 3"
+					} )
+					add( new FormComponent( "javax.swing.JLabel" ) {
+						name: "resultLabel"
+						"text": new FormMessage( null, "ProjectCreateDialog.resultLabel.text" )
+						"font": new com.jformdesigner.model.SwingDerivedFont( null, 2, 0, false )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 0 4 3 1"
+					} )
+				}, new FormLayoutConstraints( class java.lang.String ) {
+					"value": "Center"
+				} )
+				add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
+					"$layoutConstraints": "insets dialog,alignx right"
+					"$columnConstraints": "[button,fill][button,fill][button,fill]"
+					"$rowSpecs": "[fill]"
+				} ) {
+					name: "buttonBar"
+					add( new FormComponent( "javax.swing.JButton" ) {
+						name: "okButton"
+						"text": new FormMessage( null, "ProjectCreateDialog.okButton.text" )
+						"enabled": false
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "okButtonPressed", true ) )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 0 0"
+					} )
+					add( new FormComponent( "javax.swing.JButton" ) {
+						name: "cancelButton"
+						"text": new FormMessage( null, "ProjectCreateDialog.cancelButton.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "cancelButtonPressed", true ) )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 1 0"
+					} )
+					add( new FormComponent( "javax.swing.JButton" ) {
+						name: "helpButton"
+						"text": new FormMessage( null, "ProjectCreateDialog.helpButton.text" )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 2 0"
+					} )
+				}, new FormLayoutConstraints( class java.lang.String ) {
+					"value": "South"
+				} )
+			}, new FormLayoutConstraints( class java.lang.String ) {
+				"value": "Center"
+			} )
+		}, new FormLayoutConstraints( null ) {
+			"location": new java.awt.Point( 0, 0 )
+			"size": new java.awt.Dimension( 400, 300 )
+		} )
+	}
+}

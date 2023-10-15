@@ -1,0 +1,106 @@
+JFDML JFormDesigner: "8.0.5.0.268" Java: "17.0.8" encoding: "UTF-8"
+
+new FormModel {
+	"i18n.bundleName": "project_gui"
+	"i18n.autoExternalize": true
+	"i18n.keyPrefix": "ProjectStartPanel"
+	contentType: "form/swing"
+	root: new FormRoot {
+		add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
+			"$layoutConstraints": "hidemode 3"
+			"$columnConstraints": "[grow,fill]"
+			"$rowConstraints": "[][][][]ind[]0[]0[grow][][]"
+		} ) {
+			name: "this"
+			add( new FormContainer( "javax.swing.JToolBar", new FormLayoutManager( class javax.swing.JToolBar ) ) {
+				name: "toolBar1"
+				add( new FormComponent( "com.jformdesigner.designer.wrapper.HSpacer" ) {
+					name: "hSpacer6"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "button1"
+					"text": new FormMessage( null, "ProjectStartPanel.button1.text" )
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "button2"
+					"text": new FormMessage( null, "ProjectStartPanel.button2.text" )
+				} )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "north"
+			} )
+			add( new FormComponent( "javax.swing.JLabel" ) {
+				name: "titleLabel"
+				"text": new FormMessage( null, "ProjectStartPanel.titleLabel.text" )
+				"font": new com.jformdesigner.model.SwingDerivedFont( null, 0, 34, true )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 1,alignx center,grow 0 100"
+			} )
+			add( new FormComponent( "javax.swing.JLabel" ) {
+				name: "versionLabel"
+				"text": new FormMessage( null, "ProjectStartPanel.versionLabel.text" )
+				"font": new com.jformdesigner.model.SwingDerivedFont( null, 0, 19, true )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 2,alignx center,grow 0 100"
+			} )
+			add( new FormComponent( "javax.swing.JLabel" ) {
+				name: "flavorTextLabel"
+				"text": new FormMessage( null, "ProjectStartPanel.flavorTextLabel.text" )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 3,alignx center,growx 0"
+			} )
+			add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
+				"$columnConstraints": "[grow,fill]"
+				"$rowConstraints": "[][][]"
+				"$layoutConstraints": "hidemode 3"
+			} ) {
+				name: "panel1"
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "newProjectButton"
+					"text": new FormMessage( null, "ProjectStartPanel.newProjectButton.text" )
+					addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "newProject", true ) )
+				}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+					"value": "cell 0 0"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "openProjectButton"
+					"text": new FormMessage( null, "ProjectStartPanel.openProjectButton.text" )
+					addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "openProjectButtonPressed", true ) )
+				}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+					"value": "cell 0 1"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "changeThemeButton"
+					"text": new FormMessage( null, "ProjectStartPanel.changeThemeButton.text" )
+					addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "changeTheme", true ) )
+				}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+					"value": "cell 0 2"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "changeLanguageButton"
+					"text": new FormMessage( null, "ProjectStartPanel.changeLanguageButton.text" )
+				}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+					"value": "cell 0 2"
+				} )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 6"
+			} )
+			add( new FormComponent( "javax.swing.JLabel" ) {
+				name: "authorLabel"
+				"text": new FormMessage( null, "ProjectStartPanel.authorLabel.text" )
+				"font": new com.jformdesigner.model.SwingDerivedFont( null, 2, 0, false )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 7,alignx center,growx 0"
+			} )
+			add( new FormComponent( "javax.swing.JLabel" ) {
+				name: "baseAuthorLabel"
+				"text": new FormMessage( null, "ProjectStartPanel.baseAuthorLabel.text" )
+				"font": new com.jformdesigner.model.SwingDerivedFont( null, 2, 0, false )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 8,align center center,grow 0 0"
+			} )
+		}, new FormLayoutConstraints( null ) {
+			"location": new java.awt.Point( 0, 0 )
+			"size": new java.awt.Dimension( 400, 335 )
+		} )
+	}
+}

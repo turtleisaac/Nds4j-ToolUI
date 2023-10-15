@@ -1,0 +1,127 @@
+JFDML JFormDesigner: "8.0.5.0.268" Java: "17.0.8" encoding: "UTF-8"
+
+new FormModel {
+	"i18n.autoExternalize": true
+	"i18n.bundleName": "tool_gui"
+	"i18n.keyPrefix": "ToolFrame"
+	contentType: "form/swing"
+	root: new FormRoot {
+		add( new FormWindow( "javax.swing.JFrame", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
+			"$layoutConstraints": "hidemode 3"
+			"$columnConstraints": "[grow,fill]"
+			"$rowConstraints": "[grow]"
+		} ) {
+			name: "this"
+			add( new FormContainer( "javax.swing.JTabbedPane", new FormLayoutManager( class javax.swing.JTabbedPane ) ) {
+				name: "tabbedPane1"
+				"tabPlacement": 2
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "cell 0 0,grow"
+			} )
+			add( new FormContainer( "javax.swing.JToolBar", new FormLayoutManager( class javax.swing.JToolBar ) ) {
+				name: "toolBar1"
+				"floatable": false
+				add( new FormComponent( "javax.swing.JToggleButton" ) {
+					name: "tabsButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 2, "RadioButtonMenuItem.dashIcon" )
+					addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "tabsButton", true ) )
+				} )
+				add( new FormComponent( "javax.swing.JToolBar$Separator" ) {
+					name: "separator2"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "backButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 0, "/icons/arrowleft.png" )
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "forwardsButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 0, "/icons/arrowright.png" )
+				} )
+				add( new FormComponent( "javax.swing.JToolBar$Separator" ) {
+					name: "separator6"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "openButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 2, "Tree.openIcon" )
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "saveButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 2, "FileView.floppyDriveIcon" )
+				} )
+				add( new FormComponent( "javax.swing.JToolBar$Separator" ) {
+					name: "separator4"
+				} )
+				add( new FormComponent( "com.jformdesigner.designer.wrapper.HSpacer" ) {
+					name: "hSpacer1"
+				} )
+				add( new FormComponent( "javax.swing.JLabel" ) {
+					name: "titleLabel"
+					"text": new FormMessage( null, "ToolFrame.titleLabel.text" )
+					"font": new com.jformdesigner.model.SwingDerivedFont( null, 1, 0, false )
+				} )
+				add( new FormComponent( "com.jformdesigner.designer.wrapper.HSpacer" ) {
+					name: "hSpacer2"
+				} )
+				add( new FormComponent( "javax.swing.JToolBar$Separator" ) {
+					name: "separator3"
+				} )
+				add( new FormComponent( "javax.swing.JButton" ) {
+					name: "infoButton"
+					"icon": new com.jformdesigner.model.SwingIcon( 2, "Tree.leafIcon" )
+				} )
+			}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+				"value": "north"
+			} )
+			menuBar: new FormContainer( "javax.swing.JMenuBar", new FormLayoutManager( class javax.swing.JMenuBar ) ) {
+				name: "menuBar1"
+				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {
+					name: "fileMenu"
+					"text": new FormMessage( null, "ToolFrame.fileMenu.text" )
+					add( new FormComponent( "javax.swing.JMenuItem" ) {
+						name: "menuItem1"
+						"text": new FormMessage( null, "ToolFrame.menuItem1.text" )
+					} )
+					add( new FormComponent( "javax.swing.JMenuItem" ) {
+						name: "menuItem2"
+						"text": new FormMessage( null, "ToolFrame.menuItem2.text" )
+					} )
+					add( new FormComponent( "javax.swing.JPopupMenu$Separator" ) {
+						name: "separator1"
+					} )
+					add( new FormComponent( "javax.swing.JMenuItem" ) {
+						name: "menuItem3"
+						"text": new FormMessage( null, "ToolFrame.menuItem3.text" )
+					} )
+					add( new FormComponent( "javax.swing.JMenuItem" ) {
+						name: "menuItem4"
+						"text": new FormMessage( null, "ToolFrame.menuItem4.text" )
+					} )
+				} )
+				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {
+					name: "popMenu"
+					"text": new FormMessage( null, "ToolFrame.popMenu.text" )
+				} )
+				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {
+					name: "viewMenu"
+					"text": new FormMessage( null, "ToolFrame.viewMenu.text" )
+					add( new FormComponent( "javax.swing.JMenuItem" ) {
+						name: "changeThemeItem"
+						"text": new FormMessage( null, "ToolFrame.changeThemeItem.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "changeThemeItem", true ) )
+					} )
+				} )
+				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {
+					name: "debugMenu"
+					"text": new FormMessage( null, "ToolFrame.debugMenu.text" )
+				} )
+				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {
+					name: "helpMenu"
+					"text": new FormMessage( null, "ToolFrame.helpMenu.text" )
+				} )
+			}
+		}, new FormLayoutConstraints( null ) {
+			"location": new java.awt.Point( 0, 0 )
+			"size": new java.awt.Dimension( 665, 300 )
+		} )
+	}
+}

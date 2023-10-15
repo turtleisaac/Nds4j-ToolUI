@@ -17,25 +17,20 @@ import net.miginfocom.swing.*;
  * @author turtleisaac
  */
 public class ToolFrame extends JFrame {
-    private Tool tool;
+    private final Tool tool;
 
     protected ToolFrame(Tool tool) {
         initComponents();
         this.tool = tool;
-        tabbedPane1.setUI(new FlatTabbedPaneUI() {
-            @Override
-            protected boolean hideTabArea()
-            {
-                return true;
-            }
-        });
+//        tabbedPane1.setUI(new FlatTabbedPaneUI() {
+//            @Override
+//            protected boolean hideTabArea()
+//            {
+//                return true;
+//            }
+//        });
         toolBar1.add(Box.createHorizontalStrut(70),0);
         setIcons();
-
-        if (tabbedPane1.getTabCount() <= 1) {
-            toolBar1.remove(tabsButton);
-            toolBar1.remove(1);
-        }
 
 //        addComponentListener(new ComponentAdapter()
 //        {
@@ -60,22 +55,24 @@ public class ToolFrame extends JFrame {
     }
 
     /**
-     * Adds a new <code>ToolPanel</code> to this <code>ToolFrame</code>
-     * @param panel a <code>ToolPanel</code> defined by the developerx
+     * Adds the panels controlled by the provided <code>PanelManager</code> to this <code>ToolFrame</code>
+     * @param manager a <code>PanelManager</code> defined by the developer
      */
-    protected void addToolPanel(ToolPanel panel)
+    protected void addToolPanels(PanelManager manager)
     {
-        tabbedPane1.addTab(tool.getName(), panel);
+        for (JPanel panel : manager.getPanels()) {
+            tabbedPane1.addTab(panel.getName(), panel);
+        }
     }
 
     private void tabsButton(ActionEvent e) {
-        tabbedPane1.setUI(new FlatTabbedPaneUI() {
-            @Override
-            protected boolean hideTabArea()
-            {
-                return !tabsButton.isSelected();
-            }
-        });
+//        tabbedPane1.setUI(new FlatTabbedPaneUI() {
+//            @Override
+//            protected boolean hideTabArea()
+//            {
+//                return !tabsButton.isSelected();
+//            }
+//        });
     }
 
     private void changeThemeItem(ActionEvent e) {
@@ -174,11 +171,6 @@ public class ToolFrame extends JFrame {
             menuBar1.add(helpMenu);
         }
         setJMenuBar(menuBar1);
-
-        //======== tabbedPane1 ========
-        {
-            tabbedPane1.setTabPlacement(SwingConstants.LEFT);
-        }
         contentPane.add(tabbedPane1, "cell 0 0,grow");
 
         //======== toolBar1 ========

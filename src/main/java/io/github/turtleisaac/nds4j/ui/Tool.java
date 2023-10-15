@@ -50,7 +50,7 @@ public class Tool {
 
     private Image icon;
 
-    private List<Supplier<ToolPanel>> toolPanelSuppliers;
+    private List<Supplier<PanelManager>> panelManagerSuppliers;
     private List<Function<NintendoDsRom, Void>> functions;
 
     // internal usage only
@@ -65,7 +65,7 @@ public class Tool {
         gameCodes = new ArrayList<>();
         gameTitles = new ArrayList<>();
         validationChecks = new HashMap<>();
-        toolPanelSuppliers = new ArrayList<>();
+        panelManagerSuppliers = new ArrayList<>();
         functions = new ArrayList<>();
         locales = new ArrayList<>();
     }
@@ -280,21 +280,22 @@ public class Tool {
     /**
      * Adds a function to be run on the selected ROM to this <code>Tool</code>.
      * <p>This cannot be used in conjunction with the <code>addFunction()</code> function</p>
-     * @param panelSupplier a <code>Supplier</code><<code>ToolPanel</code>> which creates and returns a <code>ToolPanel</code>
-     *                      to be added to the tool window created by <code>init()</code>
+     * @param panelManagerSupplier a <code>Supplier</code><<code>PanelManager</code>> which creates and returns a
+     *                             <code>PanelManager</code>to be added to the tool window created
+     *                             by <code>init()</code>
      * @return a reference to this object
      * @throws ToolAttributeModificationException if ran after calling <code>init()</code>
      */
-    public Tool addToolPanel(Supplier<ToolPanel> panelSupplier)
+    public Tool addPanelManager(Supplier<PanelManager> panelManagerSupplier)
     {
         testStarted();
-        toolPanelSuppliers.add(panelSupplier);
+        panelManagerSuppliers.add(panelManagerSupplier);
         return this;
     }
 
     /**
      * Adds a function to be run on the selected ROM to this <code>Tool</code>.
-     * <p>This cannot be used in conjunction with the <code>addToolPanel()</code> function</p>
+     * <p>This cannot be used in conjunction with the <code>addPanelManager()</code> function</p>
      * @param function a <code>Function</code> which takes a <code>NintendoDsRom</code> as input and performs
      *                 operations on it.
      * @return a reference to this object
@@ -314,10 +315,10 @@ public class Tool {
     public void init() throws ToolCreationException
     {
         started = true;
-        if (functions.isEmpty() && toolPanelSuppliers.isEmpty())
-            throw new ToolCreationException("No tool panels or functions were provided");
-        if (!functions.isEmpty() && !toolPanelSuppliers.isEmpty())
-            throw new ToolCreationException("Both tool panels and functions were provided - please only use one type of tool functionality");
+        if (functions.isEmpty() && panelManagerSuppliers.isEmpty())
+            throw new ToolCreationException("No panel managers or functions were provided");
+        if (!functions.isEmpty() && ! panelManagerSuppliers.isEmpty())
+            throw new ToolCreationException("Both panel managers and functions were provided - please only use one type of tool functionality");
         if (functions.isEmpty() && type == null)
             throw new ToolCreationException("Program type not specified");
         if (functions.isEmpty() && (name == null || name.isEmpty()))
@@ -330,7 +331,7 @@ public class Tool {
             icon = new ImageIcon(Tool.class.getResource("/icons/cartridge.png")).getImage();
         }
 
-        windowMode = functions.isEmpty(); // if functions is empty, then toolPanelSuppliers is not, and vice-versa
+        windowMode = functions.isEmpty(); // if functions is empty, then panelManagerSuppliers is not, and vice-versa
 
         if (windowMode && SystemInfo.isMacOS)
         {
@@ -465,7 +466,10 @@ public class Tool {
         toolFrame.setTitle(name + " " + version + " " + new File(path).getName());
 //        toolFrame.setTitle(name + " " + version + " ~/Documents/Projects/HeartGold.nds");
 
-        toolFrame.addToolPanel(toolPanelSuppliers.get(0).get());
+        for (Supplier<PanelManager> panelManagerSupplier : panelManagerSuppliers) {
+            toolFrame.addToolPanels(panelManagerSupplier.get());
+        }
+
         toolFrame.setPreferredSize(toolFrame.getPreferredSize());
         toolFrame.setMinimumSize(toolFrame.getPreferredSize());
 

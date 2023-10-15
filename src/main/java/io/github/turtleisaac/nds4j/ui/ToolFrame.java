@@ -6,7 +6,9 @@ package io.github.turtleisaac.nds4j.ui;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
 import java.util.*;
+import java.util.List;
 import javax.swing.*;
 
 import com.formdev.flatlaf.ui.FlatTabbedPaneUI;
@@ -19,9 +21,12 @@ import net.miginfocom.swing.*;
 public class ToolFrame extends JFrame {
     private final Tool tool;
 
+    private List<PanelManager> panelManagers;
+
     protected ToolFrame(Tool tool) {
         initComponents();
         this.tool = tool;
+        panelManagers = new ArrayList<>();
 //        tabbedPane1.setUI(new FlatTabbedPaneUI() {
 //            @Override
 //            protected boolean hideTabArea()
@@ -60,12 +65,52 @@ public class ToolFrame extends JFrame {
      */
     protected void addToolPanels(PanelManager manager)
     {
+        panelManagers.add(manager);
         for (JPanel panel : manager.getPanels()) {
             tabbedPane1.addTab(panel.getName(), panel);
         }
     }
 
-    private void tabsButton(ActionEvent e) {
+    /**
+     * Appends the specified menu to the end of this frame's menu bar.
+     * @param menu the <code>JMenu</code> component to add
+     */
+    protected void addMenuToBar(JMenu menu)
+    {
+        menuBar1.add(menu);
+    }
+
+    /**
+     * Appends the specified menu to the end of this frame's menu bar at
+     * the given position
+     * @param menu the component to be added
+     * @param index the position at which to insert the component,
+     *              or {@code -1} to append the component to the end
+     * @throws NullPointerException if {@code comp} is {@code null}
+     * @throws IllegalArgumentException if {@code index} is invalid
+     */
+    protected void addMenuToBar(JMenu menu, int index)
+    {
+        menuBar1.add(menu, index);
+    }
+
+    /**
+     * Gets the menu with the specified name from this frame's menu bar
+     * @param name a <code>String</code> containing the name of the <code>JMenu</code> to look for
+     * @return the <code>JMenu</code> in this frame's menu bar with the given name wrapped in a <code>Optional</code> if it exists,
+     * <p>otherwise <code>Optional.empty()</code></p>
+     */
+    protected Optional<JMenu> getMenu(String name)
+    {
+        for (int i = 0; i < menuBar1.getMenuCount(); i++) {
+            String menuName = menuBar1.getMenu(i).getName();
+            if (menuName != null && menuName.equals(name))
+                return Optional.ofNullable(menuBar1.getMenu(i));
+        }
+        return Optional.empty();
+    }
+
+    private void tabsButtonPressed(ActionEvent e) {
 //        tabbedPane1.setUI(new FlatTabbedPaneUI() {
 //            @Override
 //            protected boolean hideTabArea()
@@ -77,6 +122,43 @@ public class ToolFrame extends JFrame {
 
     private void changeThemeItem(ActionEvent e) {
         ThemeUtils.changeTheme();
+    }
+
+    private void saveButtonPressed(ActionEvent e) {
+        //todo query PanelManagers for unsaved changes status
+
+        String outputPath = Tool.selectRomToExport();
+        try {
+            tool.getRom().saveToFile(outputPath, true);
+        }
+        catch(IOException exception) {
+            throw new RuntimeException(exception);
+        }
+    }
+
+    private void openProjectButtonPressed(ActionEvent e) {
+        // TODO add your code here
+    }
+
+    private void infoButtonPressed(ActionEvent e) {
+        // TODO support for multiple PanelManager instances
+        if(panelManagers.size() == 1) {
+            panelManagers.get(0).doInfoButtonAction(e);
+        }
+    }
+
+    private void backButtonPressed(ActionEvent e) {
+        // TODO support for multiple PanelManager instances
+        if(panelManagers.size() == 1) {
+            panelManagers.get(0).doBackButtonAction(e);
+        }
+    }
+
+    private void forwardsButtonPressed(ActionEvent e) {
+        // TODO support for multiple PanelManager instances
+        if(panelManagers.size() == 1) {
+            panelManagers.get(0).doForwardsButtonAction(e);
+        }
     }
 
     private void initComponents() {
@@ -121,6 +203,7 @@ public class ToolFrame extends JFrame {
             //======== fileMenu ========
             {
                 fileMenu.setText(bundle.getString("ToolFrame.fileMenu.text"));
+                fileMenu.setName("File");
 
                 //---- menuItem1 ----
                 menuItem1.setText(bundle.getString("ToolFrame.menuItem1.text"));
@@ -144,12 +227,14 @@ public class ToolFrame extends JFrame {
             //======== popMenu ========
             {
                 popMenu.setText(bundle.getString("ToolFrame.popMenu.text"));
+                popMenu.setName("Pop");
             }
             menuBar1.add(popMenu);
 
             //======== viewMenu ========
             {
                 viewMenu.setText(bundle.getString("ToolFrame.viewMenu.text"));
+                viewMenu.setName("View");
 
                 //---- changeThemeItem ----
                 changeThemeItem.setText(bundle.getString("ToolFrame.changeThemeItem.text"));
@@ -161,12 +246,14 @@ public class ToolFrame extends JFrame {
             //======== debugMenu ========
             {
                 debugMenu.setText(bundle.getString("ToolFrame.debugMenu.text"));
+                debugMenu.setName("Debug");
             }
             menuBar1.add(debugMenu);
 
             //======== helpMenu ========
             {
                 helpMenu.setText(bundle.getString("ToolFrame.helpMenu.text"));
+                helpMenu.setName("Help");
             }
             menuBar1.add(helpMenu);
         }
@@ -179,25 +266,29 @@ public class ToolFrame extends JFrame {
 
             //---- tabsButton ----
             tabsButton.setIcon(UIManager.getIcon("RadioButtonMenuItem.dashIcon"));
-            tabsButton.addActionListener(e -> tabsButton(e));
+            tabsButton.addActionListener(e -> tabsButtonPressed(e));
             toolBar1.add(tabsButton);
             toolBar1.addSeparator();
 
             //---- backButton ----
             backButton.setIcon(new ImageIcon(getClass().getResource("/icons/arrowleft.png")));
+            backButton.addActionListener(e -> backButtonPressed(e));
             toolBar1.add(backButton);
 
             //---- forwardsButton ----
             forwardsButton.setIcon(new ImageIcon(getClass().getResource("/icons/arrowright.png")));
+            forwardsButton.addActionListener(e -> forwardsButtonPressed(e));
             toolBar1.add(forwardsButton);
             toolBar1.addSeparator();
 
             //---- openButton ----
             openButton.setIcon(UIManager.getIcon("Tree.openIcon"));
+            openButton.addActionListener(e -> openProjectButtonPressed(e));
             toolBar1.add(openButton);
 
             //---- saveButton ----
             saveButton.setIcon(UIManager.getIcon("FileView.floppyDriveIcon"));
+            saveButton.addActionListener(e -> saveButtonPressed(e));
             toolBar1.add(saveButton);
             toolBar1.addSeparator();
             toolBar1.add(hSpacer1);
@@ -211,6 +302,7 @@ public class ToolFrame extends JFrame {
 
             //---- infoButton ----
             infoButton.setIcon(UIManager.getIcon("Tree.leafIcon"));
+            infoButton.addActionListener(e -> infoButtonPressed(e));
             toolBar1.add(infoButton);
         }
         contentPane.add(toolBar1, "north");

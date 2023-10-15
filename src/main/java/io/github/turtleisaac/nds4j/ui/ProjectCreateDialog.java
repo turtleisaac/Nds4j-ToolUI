@@ -31,7 +31,7 @@ public class ProjectCreateDialog extends JDialog {
     private final Tool tool;
 
     protected ProjectCreateDialog(Tool tool) {
-        super(tool.projectStartFrame);
+        super(tool.getProjectStartFrame());
         initComponents();
         setIcons();
         Dimension d = new Dimension(width, height);

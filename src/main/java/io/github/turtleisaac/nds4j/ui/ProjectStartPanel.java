@@ -64,7 +64,7 @@ public class ProjectStartPanel extends JPanel {
     {
         projectOpened = true;
         this.projectPath = projectPath;
-        tool.projectStartFrame.dispose();
+        tool.getProjectStartFrame().dispose();
     }
 
     /**

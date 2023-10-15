@@ -54,7 +54,7 @@ public class Tool {
     private List<Function<NintendoDsRom, Void>> functions;
 
     // internal usage only
-    protected JFrame projectStartFrame;
+    private JFrame projectStartFrame;
     private ToolFrame toolFrame;
 
     private NintendoDsRom rom;
@@ -573,6 +573,16 @@ public class Tool {
     public List<String> getGameCodes()
     {
         return gameCodes;
+    }
+
+    protected JFrame getProjectStartFrame()
+    {
+        return projectStartFrame;
+    }
+
+    protected ToolFrame getToolFrame()
+    {
+        return toolFrame;
     }
 
     /**

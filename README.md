@@ -5,6 +5,8 @@ This library provides all of the code needed for the initial GUI setup, ROM open
 
 It supports two modes, which are a project-based system, or direct ROM opening.
 
+See [Nds4j](https://github.com/turtleisaac/Nds4j), my library which this was designed to complement, for more info on the backend side of things.
+
 Example code:
 
 ```java

@@ -11,26 +11,73 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+/**
+ * Provides functionality relating to theme switching for a <code>Tool</code>
+ */
 public class ThemeUtils
 {
     private static final ArrayList<LookAndFeel> themes = new ArrayList<>();
     private static final ThemeIterator iterator = new ThemeIterator();
     private static LookAndFeel currentTheme;
 
+    /**
+     * A color to be used for miscellaneous purposes in dark themes
+     */
     public static final Color darkIconForegroundColor = new Color(250, 225, 0);
+
+    /**
+     * A color to be used for miscellaneous purposes in light themes
+     */
     public static final Color lightIconForegroundColor = new Color(117, 0, 250);
+
+    /**
+     * A filter to be used for adjusting the color of a SVG file displayed as an icon.
+     */
     public static final FlatSVGIcon.ColorFilter iconColorFilter = FlatSVGIcon.ColorFilter.getInstance();
 
+    /**
+     * A symbol representing a right arrow
+     */
     public static final FlatSVGIcon rightIcon;
+    /**
+     * A symbol representing a left arrow
+     */
     public static final FlatSVGIcon leftIcon;
+    /**
+     * A symbol representing a folder selection operation
+     */
     public static final FlatSVGIcon folderSearchIcon;
+    /**
+     * A symbol representing a file selection operation
+     */
     public static final FlatSVGIcon fileSearchIcon;
+    /**
+     * A symbol representing a project selection and opening operation
+     */
     public static final FlatSVGIcon folderOpenIcon;
+    /**
+     * A symbol representing a ROM or project save operation
+     */
     public static final FlatSVGIcon saveIcon;
+    /**
+     * A symbol representing an info display operation
+     */
     public static final FlatSVGIcon infoIcon;
+    /**
+     * A symbol representing a tool selection operation
+     */
     public static final FlatSVGIcon appWindowIcon;
+    /**
+     * A symbol representing valid data
+     */
     public static final FlatSVGIcon validIcon;
+    /**
+     * A symbol representing invalid data
+     */
     public static final FlatSVGIcon invalidIcon;
+    /**
+     * A symbol representing a game file
+     */
     public static final FlatSVGIcon gamepadIcon;
 
     static {
@@ -64,7 +111,9 @@ public class ThemeUtils
         }
     }
 
-
+    /**
+     * Changes the selected theme to the next one in the theme list
+     */
     public static void changeTheme()
     {
         try {
@@ -96,16 +145,10 @@ public class ThemeUtils
         }
     }
 
-    public static boolean isLight()
-    {
-        return !(currentTheme.getDescription().toLowerCase().contains("dark") || currentTheme.getName().toLowerCase().contains("dark"));
-    }
-
-    public static Color getLabelForegroundColor()
-    {
-        return isLight() ? lightIconForegroundColor : darkIconForegroundColor;
-    }
-
+    /**
+     * Changes the current theme to the saved user preference, if it is available.
+     * <p>Otherwise, uses the first theme in the theme list</p>
+     */
     protected static void changeToPreferredTheme()
     {
         String className = Tool.preferences.get("laf", null);
@@ -129,11 +172,19 @@ public class ThemeUtils
         }
     }
 
+    /**
+     * Adds a new theme to a <code>Tool</code>'s theme options
+     * @param lookAndFeel a <code>LookAndFeel</code>
+     */
     protected static void addLookAndFeel(LookAndFeel lookAndFeel)
     {
         themes.add(lookAndFeel);
     }
 
+    /**
+     * Gets the number of loaded themes
+     * @return the number of loaded themes
+     */
     protected static int themeCount()
     {
         return themes.size();
@@ -141,7 +192,7 @@ public class ThemeUtils
 
     private static class ThemeIterator implements Iterator<LookAndFeel>
     {
-        int idx = 0;
+        private int idx = 0;
 
         @Override
         public boolean hasNext()

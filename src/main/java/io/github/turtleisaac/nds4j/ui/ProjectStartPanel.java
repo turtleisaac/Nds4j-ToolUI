@@ -18,12 +18,13 @@ public class ProjectStartPanel extends JPanel {
 
     private Tool tool;
 
-    private NintendoDsRom rom;
     private String projectPath;
     private JsonNode projectInfo;
     private boolean projectOpened;
 
-    public ProjectStartPanel(Tool tool) {
+    private boolean languageButtonRemoved = false;
+
+    protected ProjectStartPanel(Tool tool) {
         initComponents();
         projectOpened = false;
 
@@ -46,7 +47,7 @@ public class ProjectStartPanel extends JPanel {
             {
                 super.windowClosed(e);
                 if (dialog.wasProjectCreated())
-                    prepareForToolWindowStart(dialog.getRom(), dialog.getProjectPath());
+                    prepareForToolWindowStart(dialog.getProjectPath());
             }
         });
         dialog.setLocationRelativeTo(this);
@@ -56,13 +57,12 @@ public class ProjectStartPanel extends JPanel {
     private void openProjectButtonPressed(ActionEvent e) {
         String projectPath = Tool.selectProject();
         NintendoDsRom rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
-        prepareForToolWindowStart(rom, projectPath);
+        prepareForToolWindowStart(projectPath);
     }
 
-    private void prepareForToolWindowStart(NintendoDsRom rom, String projectPath)
+    private void prepareForToolWindowStart(String projectPath)
     {
         projectOpened = true;
-        this.rom = rom;
         this.projectPath = projectPath;
         tool.projectStartFrame.dispose();
     }
@@ -74,15 +74,6 @@ public class ProjectStartPanel extends JPanel {
     public boolean wasProjectOpened()
     {
         return projectOpened;
-    }
-
-    /**
-     * Gets the rom loaded by this <code>ProjectStartPanel</code>
-     * @return a <code>NintendoDsRom</code>
-     */
-    public NintendoDsRom getRom()
-    {
-        return rom;
     }
 
     /**
@@ -228,25 +219,29 @@ public class ProjectStartPanel extends JPanel {
     private JLabel baseAuthorLabel;
     // JFormDesigner - End of variables declaration  //GEN-END:variables  @formatter:on
 
-    public void setTitle(String text) {
+    protected void setTitle(String text) {
         titleLabel.setText(text);
     }
 
-    public void setVersion(String text) {
+    protected void setVersion(String text) {
         versionLabel.setText(text);
     }
 
-    public void setFlavorText(String text) {
+    protected void setFlavorText(String text) {
         flavorTextLabel.setText(text);
     }
 
-    public void setAuthor(String text) {
+    protected void setAuthor(String text) {
         authorLabel.setText(text);
     }
 
     private boolean themeButtonRemoved = false;
 
-    public void removeThemeButton() {
+    /**
+     * Removes the theme button from this panel and adjusts the position and properties of the
+     * language button if it is still present
+     */
+    protected void removeThemeButton() {
         panel1.remove(changeThemeButton);
         if (!languageButtonRemoved) {
             remove(changeLanguageButton);
@@ -255,9 +250,11 @@ public class ProjectStartPanel extends JPanel {
         themeButtonRemoved = true;
     }
 
-    private boolean languageButtonRemoved = false;
-
-    public void removeLanguageButton() {
+    /**
+     * Removes the language button from this panel and adjusts the position and properties of the
+     * theme button if it is still present
+     */
+    protected void removeLanguageButton() {
         panel1.remove(changeLanguageButton);
         if (!themeButtonRemoved) {
             remove(changeThemeButton);

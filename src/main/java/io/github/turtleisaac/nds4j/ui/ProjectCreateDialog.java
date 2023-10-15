@@ -14,7 +14,6 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import io.github.turtleisaac.nds4j.NintendoDsRom;
 import net.miginfocom.swing.*;
 
 /**
@@ -26,13 +25,12 @@ public class ProjectCreateDialog extends JDialog {
 
     private static String resultPrefix;
 
-    private NintendoDsRom rom = null;
     private String projectPath;
     private boolean projectCreated = false;
 
     private final Tool tool;
 
-    public ProjectCreateDialog(Tool tool) {
+    protected ProjectCreateDialog(Tool tool) {
         super(tool.projectStartFrame);
         initComponents();
         setIcons();
@@ -102,7 +100,7 @@ public class ProjectCreateDialog extends JDialog {
 
     private void attemptEnableOkButton()
     {
-        okButton.setEnabled(rom != null && !projectNameField.getText().isEmpty() && !parentFolderField.getText().isEmpty());
+        okButton.setEnabled(tool.getRom() != null && !projectNameField.getText().isEmpty() && !parentFolderField.getText().isEmpty());
     }
 
     private void cancelButtonPressed(ActionEvent e) {
@@ -110,20 +108,7 @@ public class ProjectCreateDialog extends JDialog {
     }
 
     private void baseRomButtonPressed(ActionEvent e) {
-        String romPath = Tool.selectRom();
-        if (romPath == null)
-            return;
-
-        rom = NintendoDsRom.fromFile(romPath);
-        Tool.RomSupportContext supportContext = tool.isRomSupported(rom);
-
-        if (!supportContext.isSupported()) {
-            String errorMessage = supportContext.getErrorMessage().orElse("This ROM has failed a validation check for an unknown reason.");
-            JOptionPane.showMessageDialog(this, errorMessage, "ROM Not Supported", JOptionPane.ERROR_MESSAGE);
-            rom = null;
-            return;
-        }
-
+        String romPath = tool.selectAndValidateRom(this);
         baseRomField.setText(romPath);
         attemptEnableOkButton();
     }
@@ -157,7 +142,7 @@ public class ProjectCreateDialog extends JDialog {
 //            if (!projectDir.mkdir())
 //                throw new RuntimeException("Failed to create project directory: " + projectDir.getAbsolutePath());
 
-            rom.unpack(FileUtils.getProjectUnpackedRomPath(projectDir.getAbsolutePath()));
+            tool.getRom().unpack(FileUtils.getProjectUnpackedRomPath(projectDir.getAbsolutePath()));
             projectCreated = true;
             projectPath = projectDir.getAbsolutePath();
             File projectFile = new File(FileUtils.getProjectfilePath(projectDir.getAbsolutePath()));
@@ -177,11 +162,6 @@ public class ProjectCreateDialog extends JDialog {
     }
 
     protected boolean wasProjectCreated() {return projectCreated;}
-
-    protected NintendoDsRom getRom()
-    {
-        return rom;
-    }
 
     protected String getProjectPath() {return projectPath;}
 

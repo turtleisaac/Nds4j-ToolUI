@@ -8,11 +8,26 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Contains data and methods which assist in the disk access operations of a <code>Tool</code>
+ */
 public class FileUtils
 {
+    /**
+     * The name of the file contained within a project directory which contains any info stored by the developer
+     */
     public static final String projectFileName = "Projectfile";
+    /**
+     * The accepted file extensions for Nintendo DS ROMs
+     */
     public static final String[] ndsExtensions = {".nds", ".srl"};
-    protected static final RomFilter romFilter = new RomFilter("Nintendo DS ROM", ndsExtensions);
+    /**
+     * A <code>ExtensionFilter</code> which displays only files with Nintendo DS ROM file extensions
+     */
+    protected static final ExtensionFilter romFilter = new ExtensionFilter("Nintendo DS ROM", ndsExtensions);
+    /**
+     * A <code>FileFilter</code> which displays only project files or folders which directly contain one.
+     */
     protected static final FileFilter projectFilter = new FileFilter()
     {
         @Override
@@ -37,16 +52,29 @@ public class FileUtils
         return null;
     }
 
+    /**
+     * Given the path to a project, returns the path to the project file inside of it
+     * @param projectPath a <code>String</code> containing the absolute path of a project directory
+     * @return a <code>String</code>
+     */
     public static String getProjectfilePath(String projectPath)
     {
         return Path.of(projectPath, projectFileName).toString();
     }
 
+    /**
+     * Given the path to a project, returns the path to the unpacked ROM data inside of it
+     * @param projectPath a <code>String</code> containing the absolute path of a project directory
+     * @return a <code>String</code>
+     */
     public static String getProjectUnpackedRomPath(String projectPath)
     {
         return Path.of(projectPath, "rom").toString();
     }
 
+    /**
+     * An implementation of <code>FileView</code> which gives special icons to Nintendo DS ROMs and projects of this framework
+     */
     static class ToolFileView extends FileView
     {
         public String getTypeDescription(File f) {
@@ -104,12 +132,20 @@ public class FileUtils
         }
     }
 
-    static class RomFilter extends FileFilter
+    /**
+     * An implementation of <code>FileFilter</code> which filters out files which do not have the specified file extensions
+     */
+    static class ExtensionFilter extends FileFilter
     {
         private final String[] extensions;
         private final String description;
 
-        public RomFilter(String description, String... extensions)
+        /**
+         * Creates a new <code>ExtensionFilter</code> which only shows files with the specified extensions
+         * @param description a <code>String</code> containing the description to show for the allowed file types
+         * @param extensions a <code>String[]</code> containing the allowed file types (including the "dot")
+         */
+        public ExtensionFilter(String description, String... extensions)
         {
             this.extensions = extensions;
             this.description = description;

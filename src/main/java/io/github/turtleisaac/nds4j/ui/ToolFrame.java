@@ -13,12 +13,13 @@ import com.formdev.flatlaf.ui.FlatTabbedPaneUI;
 import net.miginfocom.swing.*;
 
 /**
+ * A class which represents the frame for a tool, incorporating pre-defined elements and user-defined panels
  * @author turtleisaac
  */
 public class ToolFrame extends JFrame {
     private Tool tool;
 
-    public ToolFrame(Tool tool) {
+    protected ToolFrame(Tool tool) {
         initComponents();
         this.tool = tool;
         tabbedPane1.setUI(new FlatTabbedPaneUI() {
@@ -30,7 +31,6 @@ public class ToolFrame extends JFrame {
         });
         toolBar1.add(Box.createHorizontalStrut(70),0);
         setIcons();
-
 
         if (tabbedPane1.getTabCount() <= 1) {
             toolBar1.remove(tabsButton);
@@ -59,6 +59,10 @@ public class ToolFrame extends JFrame {
         pack();
     }
 
+    /**
+     * Adds a new <code>ToolPanel</code> to this <code>ToolFrame</code>
+     * @param panel a <code>ToolPanel</code> defined by the developerx
+     */
     protected void addToolPanel(ToolPanel panel)
     {
         tabbedPane1.addTab(tool.getName(), panel);

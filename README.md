@@ -3,7 +3,11 @@ Framework for development of Nintendo DS ROMhacking tools.
 
 This library provides all of the code needed for the initial GUI setup, ROM opening, and more for making your own DS hacking tools.
 
+Probably not usable currently since I don't have the newest changes to Nds4j on maven yet.
+
 It supports two modes, which are a project-based system, or direct ROM opening.
+
+See [Nds4j](https://github.com/turtleisaac/Nds4j), my library which this was designed to complement, for more info on the backend side of things.
 
 Example code:
 

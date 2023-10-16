@@ -12,6 +12,7 @@ import java.util.List;
 import javax.swing.*;
 
 import com.formdev.flatlaf.ui.FlatTabbedPaneUI;
+import com.formdev.flatlaf.util.SystemInfo;
 import net.miginfocom.swing.*;
 
 /**
@@ -20,6 +21,8 @@ import net.miginfocom.swing.*;
  */
 public class ToolFrame extends JFrame {
     private final Tool tool;
+
+    private final Component macOsSpacer;
 
     private List<PanelManager> panelManagers;
 
@@ -34,7 +37,10 @@ public class ToolFrame extends JFrame {
 //                return true;
 //            }
 //        });
-        toolBar1.add(Box.createHorizontalStrut(70),0);
+
+
+        macOsSpacer = Box.createHorizontalStrut(70);
+        toolBar1.add(macOsSpacer,0);
         setIcons();
 
 //        addComponentListener(new ComponentAdapter()
@@ -156,9 +162,23 @@ public class ToolFrame extends JFrame {
 
     private void forwardsButtonPressed(ActionEvent e) {
         // TODO support for multiple PanelManager instances
-        if(panelManagers.size() == 1) {
+        if (panelManagers.size() == 1) {
             panelManagers.get(0).doForwardsButtonAction(e);
         }
+    }
+
+    private void thisWindowStateChanged(WindowEvent e) {
+        boolean isMaximized = e.getNewState() == MAXIMIZED_BOTH;
+        boolean wasMaximized = e.getOldState() == MAXIMIZED_BOTH;
+
+        if (SystemInfo.isMacFullWindowContentSupported)
+        {
+            if (isMaximized && !wasMaximized)
+                toolBar1.remove(macOsSpacer);
+            else if (wasMaximized && !isMaximized)
+                toolBar1.add(macOsSpacer,0);
+        }
+
     }
 
     private void initComponents() {
@@ -189,6 +209,7 @@ public class ToolFrame extends JFrame {
         infoButton = new JButton();
 
         //======== this ========
+        addWindowStateListener(e -> thisWindowStateChanged(e));
         var contentPane = getContentPane();
         contentPane.setLayout(new MigLayout(
             "hidemode 3",

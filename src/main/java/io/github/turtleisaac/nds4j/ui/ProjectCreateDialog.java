@@ -139,8 +139,8 @@ public class ProjectCreateDialog extends JDialog {
         File projectDir = Path.of(parentFolderField.getText(), projectNameField.getText()).toFile();
 
         try {
-//            if (!projectDir.mkdir())
-//                throw new RuntimeException("Failed to create project directory: " + projectDir.getAbsolutePath());
+            if (!projectDir.mkdir())
+                throw new RuntimeException("Failed to create project directory: " + projectDir.getAbsolutePath());
 
             tool.getRom().unpack(FileUtils.getProjectUnpackedRomPath(projectDir.getAbsolutePath()));
             projectCreated = true;

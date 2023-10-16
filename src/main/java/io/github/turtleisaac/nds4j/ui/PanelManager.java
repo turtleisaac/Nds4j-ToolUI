@@ -67,4 +67,9 @@ public abstract class PanelManager
     {
         return tool.getToolFrame().getMenu(name);
     }
+
+    public boolean wipeAndWriteUnpacked()
+    {
+        return tool.wipeAndWriteUnpacked();
+    }
 }

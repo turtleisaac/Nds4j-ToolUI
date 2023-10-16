@@ -640,9 +640,19 @@ public class Tool {
         return sb.toString();
     }
 
-    public void wipeAndWriteUnpacked()
+    public boolean wipeAndWriteUnpacked()
     {
-        FileUtils.clearDirectory(new File(FileUtils.getProjectUnpackedRomPath(path)));
+        if (!FileUtils.clearDirectory(new File(FileUtils.getProjectUnpackedRomPath(path))))
+            return false;
+
+        try
+        {
+            rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
+        }
+        catch(IOException e) {
+            throw new RuntimeException(e);
+        }
+        return true;
     }
 
     /**

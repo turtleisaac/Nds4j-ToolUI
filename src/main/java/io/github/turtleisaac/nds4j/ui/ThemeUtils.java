@@ -87,6 +87,10 @@ public class ThemeUtils
      * A symbol representing a zoom-out operation
      */
     public static final FlatSVGIcon zoomOutIcon;
+    /**
+     * A symbol representing a refresh/reload operation
+     */
+    public static final FlatSVGIcon reloadIcon;
 
     static {
         try {
@@ -103,6 +107,7 @@ public class ThemeUtils
             gamepadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/device-gamepad.svg"));
             zoomInIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-in.svg"));
             zoomOutIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-out.svg"));
+            reloadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/refresh.svg"));
 
             leftIcon.setColorFilter(iconColorFilter);
             rightIcon.setColorFilter(iconColorFilter);
@@ -117,6 +122,7 @@ public class ThemeUtils
             gamepadIcon.setColorFilter(iconColorFilter);
             zoomInIcon.setColorFilter(iconColorFilter);
             zoomOutIcon.setColorFilter(iconColorFilter);
+            reloadIcon.setColorFilter(iconColorFilter);
         }
         catch(IOException e) {
             throw new RuntimeException(e);

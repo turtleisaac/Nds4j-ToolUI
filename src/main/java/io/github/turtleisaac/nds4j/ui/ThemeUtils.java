@@ -79,6 +79,14 @@ public class ThemeUtils
      * A symbol representing a game file
      */
     public static final FlatSVGIcon gamepadIcon;
+    /**
+     * A symbol representing a zoom-in operation
+     */
+    public static final FlatSVGIcon zoomInIcon;
+    /**
+     * A symbol representing a zoom-out operation
+     */
+    public static final FlatSVGIcon zoomOutIcon;
 
     static {
         try {
@@ -93,6 +101,8 @@ public class ThemeUtils
             validIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/checks.svg"));
             invalidIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/alert-circle.svg"));
             gamepadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/device-gamepad.svg"));
+            zoomInIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-in.svg"));
+            zoomOutIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-out.svg"));
 
             leftIcon.setColorFilter(iconColorFilter);
             rightIcon.setColorFilter(iconColorFilter);
@@ -105,6 +115,8 @@ public class ThemeUtils
             validIcon.setColorFilter(iconColorFilter);
             invalidIcon.setColorFilter(iconColorFilter);
             gamepadIcon.setColorFilter(iconColorFilter);
+            zoomInIcon.setColorFilter(iconColorFilter);
+            zoomOutIcon.setColorFilter(iconColorFilter);
         }
         catch(IOException e) {
             throw new RuntimeException(e);

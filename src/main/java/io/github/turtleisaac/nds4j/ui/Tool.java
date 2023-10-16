@@ -454,6 +454,8 @@ public class Tool {
         projectStartFrame.setVisible(true);
     }
 
+    private String path;
+
     /**
      * Starts the window of this <code>Tool</code>
      * @param path a <code>String</code> containing either the path to the selected ROM or selected project.
@@ -461,6 +463,7 @@ public class Tool {
      */
     protected void startToolWindow(String path)
     {
+        this.path = path;
         toolFrame = new ToolFrame(this);
         //todo uncomment
         toolFrame.setTitle(name + " " + version + " " + new File(path).getName());
@@ -635,6 +638,11 @@ public class Tool {
             sb.append(")");
         }
         return sb.toString();
+    }
+
+    public void wipeAndWriteUnpacked()
+    {
+        FileUtils.clearDirectory(new File(FileUtils.getProjectUnpackedRomPath(path)));
     }
 
     /**

@@ -7,6 +7,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Contains data and methods which assist in the disk access operations of a <code>Tool</code>
@@ -71,6 +72,32 @@ public class FileUtils
     {
         return Path.of(projectPath, "rom").toString();
     }
+
+
+    /**
+     * Recursively deletes the contents of a given directory, then deletes the directory itself
+     * @param directory a <code>File</code> representing a file to delete
+     * @return a <code>boolean</code> containing whether deletion occurred successfully
+     */
+    protected static boolean clearDirectory(File directory)
+    {
+        if (directory.isDirectory())
+        {
+            for (File subfile : Objects.requireNonNull(directory.listFiles()))
+            {
+                if (subfile.isDirectory())
+                {
+                    clearDirectory(subfile);
+                }
+                else
+                {
+                    return subfile.delete();
+                }
+            }
+        }
+        return directory.delete();
+    }
+
 
     /**
      * An implementation of <code>FileView</code> which gives special icons to Nintendo DS ROMs and projects of this framework

@@ -289,6 +289,7 @@ public class ToolFrame extends JFrame {
             {
                 viewMenu.setText(bundle.getString("ToolFrame.viewMenu.text"));
                 viewMenu.setName("View");
+                viewMenu.setEnabled(false);
 
                 //---- changeThemeItem ----
                 changeThemeItem.setText(bundle.getString("ToolFrame.changeThemeItem.text"));

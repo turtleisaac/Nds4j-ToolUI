@@ -113,6 +113,7 @@ new FormModel {
 					name: "viewMenu"
 					"text": new FormMessage( null, "ToolFrame.viewMenu.text" )
 					"name": "View"
+					"enabled": false
 					add( new FormComponent( "javax.swing.JMenuItem" ) {
 						name: "changeThemeItem"
 						"text": new FormMessage( null, "ToolFrame.changeThemeItem.text" )

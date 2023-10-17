@@ -38,9 +38,13 @@ public class ToolFrame extends JFrame {
 //            }
 //        });
 
-
         macOsSpacer = Box.createHorizontalStrut(70);
-        toolBar1.add(macOsSpacer,0);
+        if (SystemInfo.isMacOS) {
+            toolBar1.add(macOsSpacer,0);
+        } else {
+            toolBar1.remove(titleLabel);
+        }
+
         setIcons();
 
 //        addComponentListener(new ComponentAdapter()
@@ -185,7 +189,6 @@ public class ToolFrame extends JFrame {
     }
 
     private void thisWindowClosing(WindowEvent e) {
-        // TODO add your code here
         boolean unsaved = false;
         for (PanelManager manager : panelManagers) {
             if (manager.hasUnsavedChanges()) {

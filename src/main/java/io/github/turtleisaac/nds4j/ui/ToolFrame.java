@@ -33,13 +33,7 @@ public class ToolFrame extends JFrame {
         this.tool = tool;
         panelManagers = new ArrayList<>();
         poppedPanelMap = new HashMap<>();
-//        tabbedPane1.setUI(new FlatTabbedPaneUI() {
-//            @Override
-//            protected boolean hideTabArea()
-//            {
-//                return true;
-//            }
-//        });
+        tabsButton.setSelected(true);
 
         macOsSpacer = Box.createHorizontalStrut(70);
         if (SystemInfo.isMacOS) {
@@ -132,13 +126,14 @@ public class ToolFrame extends JFrame {
     }
 
     private void tabsButtonPressed(ActionEvent e) {
-//        tabbedPane1.setUI(new FlatTabbedPaneUI() {
-//            @Override
-//            protected boolean hideTabArea()
-//            {
-//                return !tabsButton.isSelected();
-//            }
-//        });
+        tabbedPane1.updateUI();
+        tabbedPane1.setUI(new FlatTabbedPaneUI() {
+            @Override
+            protected boolean hideTabArea()
+            {
+                return !tabsButton.isSelected();
+            }
+        });
     }
 
     private void changeThemeItem(ActionEvent e) {

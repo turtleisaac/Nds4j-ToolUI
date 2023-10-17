@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.List;
 import javax.swing.*;
+import javax.swing.event.*;
 
 import com.formdev.flatlaf.ui.FlatTabbedPaneUI;
 import com.formdev.flatlaf.util.SystemInfo;
@@ -25,11 +26,13 @@ public class ToolFrame extends JFrame {
     private final Component macOsSpacer;
 
     private List<PanelManager> panelManagers;
+    private Map<JPanel, PoppedPanelFrame> poppedPanelMap;
 
     protected ToolFrame(Tool tool) {
         initComponents();
         this.tool = tool;
         panelManagers = new ArrayList<>();
+        poppedPanelMap = new HashMap<>();
 //        tabbedPane1.setUI(new FlatTabbedPaneUI() {
 //            @Override
 //            protected boolean hideTabArea()
@@ -78,6 +81,14 @@ public class ToolFrame extends JFrame {
         panelManagers.add(manager);
         for (JPanel panel : manager.getPanels()) {
             tabbedPane1.addTab(panel.getName(), panel);
+            JCheckBoxMenuItem popItem = new JCheckBoxMenuItem(panel.getName());
+            popMenu.add(popItem);
+            popItem.addActionListener(e -> {
+                if (((AbstractButton) e.getSource()).getModel().isSelected())
+                    poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel));
+                else
+                    poppedPanelMap.get(panel).dispose();
+            });
         }
     }
 
@@ -161,17 +172,38 @@ public class ToolFrame extends JFrame {
     }
 
     private void backButtonPressed(ActionEvent e) {
-        // TODO support for multiple PanelManager instances
-        if(panelManagers.size() == 1) {
-            panelManagers.get(0).doBackButtonAction(e);
-        }
+        tabMovementHelper(false);
     }
 
     private void forwardsButtonPressed(ActionEvent e) {
-        // TODO support for multiple PanelManager instances
-        if (panelManagers.size() == 1) {
-            panelManagers.get(0).doForwardsButtonAction(e);
+        tabMovementHelper(true);
+    }
+
+    private void tabMovementHelper(boolean forwards)
+    {
+        Component selected = tabbedPane1.getSelectedComponent();
+        if (selected == null)
+            return;
+
+        int idx = tabbedPane1.indexOfComponent(selected);
+        String title = tabbedPane1.getTitleAt(idx);
+        Icon icon = tabbedPane1.getIconAt(idx);
+
+        int newIdx;
+        if (forwards && idx < tabbedPane1.getTabCount() - 1)
+        {
+            newIdx = idx + 1;
+            tabbedPane1.insertTab(title, icon, selected, tabbedPane1.getToolTipTextAt(idx), newIdx + 1);
         }
+        else if (!forwards && idx > 0)
+        {
+            newIdx = idx - 1;
+            tabbedPane1.insertTab(title, icon, selected, tabbedPane1.getToolTipTextAt(idx), newIdx);
+        }
+        else {
+            return;
+        }
+        tabbedPane1.setSelectedIndex(newIdx);
     }
 
     private void thisWindowStateChanged(WindowEvent e) {
@@ -400,4 +432,46 @@ public class ToolFrame extends JFrame {
     private JPanel hSpacer2;
     private JButton infoButton;
     // JFormDesigner - End of variables declaration  //GEN-END:variables  @formatter:on
+
+    class PoppedPanelFrame extends JFrame
+    {
+        private final JPanel panel;
+        
+        public PoppedPanelFrame(ToolFrame parent, JPanel panel)
+        {
+            super();
+            this.panel = panel;
+
+            tabbedPane1.remove(panel);
+            JMenuBar menuBar = new JMenuBar();
+            JMenuItem putBackMenu = new JMenuItem();
+            putBackMenu.addActionListener(e -> putBack());
+            menuBar.add(putBackMenu);
+
+            setJMenuBar(menuBar);
+            setTitle(panel.getName());
+            setContentPane(panel);
+            setPreferredSize(panel.getPreferredSize());
+            setMinimumSize(panel.getMinimumSize());
+            setLocationRelativeTo(parent);
+            setVisible(true);
+            pack();
+
+            addWindowListener(new WindowAdapter()
+            {
+                @Override
+                public void windowClosed(WindowEvent e)
+                {
+                    putBack();
+                    super.windowClosed(e);
+                }
+            });
+        }
+        
+        private void putBack()
+        {
+            remove(panel);
+            tabbedPane1.addTab(panel.getName(), panel);
+        }
+    }
 }

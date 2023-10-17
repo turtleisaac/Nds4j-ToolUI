@@ -38,15 +38,15 @@ public abstract class PanelManager
      */
     public abstract boolean hasUnsavedChanges();
 
-    /**
-     * A function which will be called when the forwards button (right facing arrow) is pressed in the tool frame.
-     */
-    public abstract void doForwardsButtonAction(ActionEvent e);
-
-    /**
-     * A function which will be called when the back button (left facing arrow) is pressed in the tool frame.
-     */
-    public abstract void doBackButtonAction(ActionEvent e);
+//    /**
+//     * A function which will be called when the forwards button (right facing arrow) is pressed in the tool frame.
+//     */
+//    public abstract void doForwardsButtonAction(ActionEvent e);
+//
+//    /**
+//     * A function which will be called when the back button (left facing arrow) is pressed in the tool frame.
+//     */
+//    public abstract void doBackButtonAction(ActionEvent e);
 
     /**
      * A function which will be called when the info button (the one with the letter "i") is pressed in the tool frame.

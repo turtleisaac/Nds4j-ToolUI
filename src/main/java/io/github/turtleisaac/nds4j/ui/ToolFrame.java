@@ -134,6 +134,8 @@ public class ToolFrame extends JFrame {
         //todo query PanelManagers for unsaved changes status
 
         String outputPath = Tool.selectRomToExport();
+        if (outputPath == null)
+            return;
         try {
             tool.getRom().saveToFile(outputPath, true);
         }
@@ -144,6 +146,7 @@ public class ToolFrame extends JFrame {
 
     private void openProjectButtonPressed(ActionEvent e) {
         // TODO add your code here
+        JOptionPane.showMessageDialog(this, "Not yet implemented", "Sorry", JOptionPane.ERROR_MESSAGE);
     }
 
     private void infoButtonPressed(ActionEvent e) {
@@ -181,6 +184,27 @@ public class ToolFrame extends JFrame {
 
     }
 
+    private void thisWindowClosing(WindowEvent e) {
+        // TODO add your code here
+        boolean unsaved = false;
+        for (PanelManager manager : panelManagers) {
+            if (manager.hasUnsavedChanges()) {
+                unsaved = true;
+                break;
+            }
+        }
+
+        if (!unsaved) {
+            dispose();
+            return;
+        }
+
+
+        int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", "PokEditor", JOptionPane.YES_NO_OPTION);
+        if (result == JOptionPane.YES_OPTION)
+            dispose();
+    }
+
     private void initComponents() {
         // JFormDesigner - Component initialization - DO NOT MODIFY  //GEN-BEGIN:initComponents  @formatter:off
         // Generated using JFormDesigner non-commercial license
@@ -210,6 +234,12 @@ public class ToolFrame extends JFrame {
 
         //======== this ========
         addWindowStateListener(e -> thisWindowStateChanged(e));
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                thisWindowClosing(e);
+            }
+        });
         var contentPane = getContentPane();
         contentPane.setLayout(new MigLayout(
             "hidemode 3",

@@ -481,6 +481,16 @@ public class Tool {
         toolFrame.setLocationRelativeTo(null);
         handleMacOS(toolFrame);
         toolFrame.setVisible(true);
+
+        toolFrame.addWindowListener(new WindowAdapter()
+        {
+            @Override
+            public void windowClosed(WindowEvent e)
+            {
+                super.windowClosed(e);
+                System.exit(0);
+            }
+        });
     }
 
     /**

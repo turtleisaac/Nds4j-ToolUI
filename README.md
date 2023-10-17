@@ -109,3 +109,25 @@ The above code does the following:
 3. Runs the code specified by `.addFunction()` on their ROM
    * (this code in particular sets the personal species data for all species to that of the Pokémon Bidoof, which is at index 399 in the personal NARC)
 5. Gives the user a prompt to save the output ROM file to disk.
+
+
+## Reasoning and potential roadmap
+
+The system of having a PanelManager is designed such that you can have multiple independent PanelManager instances, effectively a programmatic precursor to running multiple tools or plugins at once,
+which all only have control over and knowledge of the JPanels that they themselves create. This means no runaway out of control error can affect other PanelManagers, and no PanelManager
+has the capability to access any JPanel that it did not create unless you go out of your way to program it. It definitely seems convoluted for the first example
+since defining a new instance of PanelManager inline looks very ugly, but looking at [this example](https://github.com/turtleisaac/PokEditor/blob/8958eecbab451d29f9127a583491d787a9b70048/src/main/java/io/github/turtleisaac/pokeditor/Main.java#L47)
+in my program [PokEditor](https://github.com/turtleisaac/PokEditor) shows how clean a main method can be for a tool which implements this library. It also will open the door to
+future development of plugins for tools.
+
+Effectively, in my opinion, the PanelManager as a concept is to facilitate the sharing and coordination of data between the JPanels it controls without affecting
+the operation of any other panel. If you have two completely unrelated functions on separate panels that have no need to share ANY data between each other,
+then they should be controlled by separate PanelManager implementations under this schema.
+
+The case can also be made for having a PanelManager which controls its own subset of child PanelManagers based on the needs of your implementation, but
+obviously there is a point where that is inefficient.
+
+I am considering extending [NintendoDsRom](https://javadoc.io/doc/io.github.turtleisaac/Nds4j/latest/io/github/turtleisaac/nds4j/NintendoDsRom.html)
+specifically for this library to create a thread-safe version which locks access to a file contained within the ROM to only one PanelManager at a time
+to better facilitate multiple PanelManagers which are capable of editing the same data (in different ways obviously) co-existing at the same time,
+but am open to feedback on this matter.

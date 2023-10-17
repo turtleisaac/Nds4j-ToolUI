@@ -460,10 +460,10 @@ public class ToolFrame extends JFrame {
             addWindowListener(new WindowAdapter()
             {
                 @Override
-                public void windowClosed(WindowEvent e)
+                public void windowClosing(WindowEvent e)
                 {
                     putBack();
-                    super.windowClosed(e);
+                    super.windowClosing(e);
                 }
             });
         }

@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -51,7 +52,7 @@ public class Tool {
     private Image icon;
 
     private List<Supplier<PanelManager>> panelManagerSuppliers;
-    private List<Function<NintendoDsRom, Void>> functions;
+    private List<Consumer<NintendoDsRom>> functions;
 
     // internal usage only
     private JFrame projectStartFrame;
@@ -301,7 +302,7 @@ public class Tool {
      * @return a reference to this object
      * @throws ToolAttributeModificationException if ran after calling <code>init()</code>
      */
-    public Tool addFunction(Function<NintendoDsRom, Void> function)
+    public Tool addFunction(Consumer<NintendoDsRom> function)
     {
         testStarted();
         functions.add(function);
@@ -498,8 +499,8 @@ public class Tool {
      */
     protected void runProvidedFunctions()
     {
-        for (Function<NintendoDsRom, Void> function : functions) {
-            function.apply(rom);
+        for (Consumer<NintendoDsRom> function : functions) {
+            function.accept(rom);
         }
     }
 

@@ -26,6 +26,8 @@ public class ToolFrame extends JFrame {
     private final Component macOsSpacer;
 
     private List<PanelManager> panelManagers;
+    private Map<PanelManager, List<PanelManager.PanelGroup>> panelGroupMap;
+
     private Map<JPanel, PoppedPanelFrame> poppedPanelMap;
 
     protected ToolFrame(Tool tool) {
@@ -33,6 +35,7 @@ public class ToolFrame extends JFrame {
         this.tool = tool;
         panelManagers = new ArrayList<>();
         poppedPanelMap = new HashMap<>();
+        panelGroupMap = new HashMap<>();
         tabsButton.setSelected(true);
 
         macOsSpacer = Box.createHorizontalStrut(70);
@@ -73,15 +76,31 @@ public class ToolFrame extends JFrame {
     protected void addToolPanels(PanelManager manager)
     {
         panelManagers.add(manager);
+//        panelGroupMap.computeIfAbsent(manager, );
         for (JPanel panel : manager.getPanels()) {
-            tabbedPane1.addTab(panel.getName(), panel);
+            if (panel instanceof PanelManager.PanelGroup group)
+            {
+                if (group.getPanelCount() < 1)
+                    continue;
+                tabbedPane1.addTab(group.getName(), group.getPanels()[0]);
+                tabbedPane1.setTabComponentAt(tabbedPane1.getTabCount()-1, group);
+                group.setContainer(tabbedPane1);
+                group.containerSelectedTabChanged();
+            }
+            else
+            {
+                tabbedPane1.add(panel.getName(), panel);
+            }
+
             JCheckBoxMenuItem popItem = new JCheckBoxMenuItem(panel.getName());
             popMenu.add(popItem);
             popItem.addActionListener(e -> {
-                if (((AbstractButton) e.getSource()).getModel().isSelected())
+                if(((AbstractButton) e.getSource()).getModel().isSelected()) {
                     poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel));
-                else
+                }
+                else {
                     poppedPanelMap.get(panel).dispose();
+                }
             });
         }
     }
@@ -119,8 +138,9 @@ public class ToolFrame extends JFrame {
     {
         for (int i = 0; i < menuBar1.getMenuCount(); i++) {
             String menuName = menuBar1.getMenu(i).getName();
-            if (menuName != null && menuName.equals(name))
+            if(menuName != null && menuName.equals(name)) {
                 return Optional.ofNullable(menuBar1.getMenu(i));
+            }
         }
         return Optional.empty();
     }
@@ -144,8 +164,9 @@ public class ToolFrame extends JFrame {
         //todo query PanelManagers for unsaved changes status
 
         String outputPath = Tool.selectRomToExport();
-        if (outputPath == null)
+        if(outputPath == null) {
             return;
+        }
         try {
             tool.getRom().saveToFile(outputPath, true);
         }
@@ -177,12 +198,14 @@ public class ToolFrame extends JFrame {
     private void tabMovementHelper(boolean forwards)
     {
         Component selected = tabbedPane1.getSelectedComponent();
-        if (selected == null)
+        if(selected == null) {
             return;
+        }
 
         int idx = tabbedPane1.indexOfComponent(selected);
         String title = tabbedPane1.getTitleAt(idx);
         Icon icon = tabbedPane1.getIconAt(idx);
+        Component tab = tabbedPane1.getTabComponentAt(idx);
 
         int newIdx;
         if (forwards && idx < tabbedPane1.getTabCount() - 1)
@@ -199,6 +222,8 @@ public class ToolFrame extends JFrame {
             return;
         }
         tabbedPane1.setSelectedIndex(newIdx);
+        tabbedPane1.setTabComponentAt(newIdx, tab);
+        tabbedPane1TabChanged(null);
     }
 
     private void thisWindowStateChanged(WindowEvent e) {
@@ -207,10 +232,12 @@ public class ToolFrame extends JFrame {
 
         if (SystemInfo.isMacFullWindowContentSupported)
         {
-            if (isMaximized && !wasMaximized)
+            if(isMaximized && ! wasMaximized) {
                 toolBar1.remove(macOsSpacer);
-            else if (wasMaximized && !isMaximized)
-                toolBar1.add(macOsSpacer,0);
+            }
+            else if(wasMaximized && ! isMaximized) {
+                toolBar1.add(macOsSpacer, 0);
+            }
         }
 
     }
@@ -231,8 +258,15 @@ public class ToolFrame extends JFrame {
 
 
         int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", "PokEditor", JOptionPane.YES_NO_OPTION);
-        if (result == JOptionPane.YES_OPTION)
+        if(result == JOptionPane.YES_OPTION) {
             dispose();
+        }
+    }
+
+    private void tabbedPane1TabChanged(ChangeEvent e) {
+        for (PanelManager manager : panelManagers) {
+            manager.doToolFrameSelectedTabChangedAction(e);
+        }
     }
 
     private void initComponents() {
@@ -340,6 +374,11 @@ public class ToolFrame extends JFrame {
             menuBar1.add(helpMenu);
         }
         setJMenuBar(menuBar1);
+
+        //======== tabbedPane1 ========
+        {
+            tabbedPane1.addChangeListener(e -> tabbedPane1TabChanged(e));
+        }
         contentPane.add(tabbedPane1, "cell 0 0,grow");
 
         //======== toolBar1 ========
@@ -430,14 +469,12 @@ public class ToolFrame extends JFrame {
 
     class PoppedPanelFrame extends JFrame
     {
-        private final JPanel panel;
-        
+        private final PanelManager.PanelGroup panelGroup;
+
         public PoppedPanelFrame(ToolFrame parent, JPanel panel)
         {
             super();
-            this.panel = panel;
 
-            tabbedPane1.remove(panel);
             JMenuBar menuBar = new JMenuBar();
             JMenuItem putBackMenu = new JMenuItem();
             putBackMenu.addActionListener(e -> putBack());
@@ -445,9 +482,22 @@ public class ToolFrame extends JFrame {
 
             setJMenuBar(menuBar);
             setTitle(panel.getName());
-            setContentPane(panel);
-            setPreferredSize(panel.getPreferredSize());
-            setMinimumSize(panel.getMinimumSize());
+
+            if (panel instanceof PanelManager.PanelGroup group)
+            {
+                this.panelGroup = group;
+                tabbedPane1.removeTabAt(tabbedPane1.indexOfTabComponent(group));
+                setContentPane(constructTabbedContainer(group));
+            }
+            else
+            {
+                this.panelGroup = null;
+                tabbedPane1.remove(panel);
+                setContentPane(panel);
+            }
+
+            setPreferredSize(getContentPane().getPreferredSize());
+            setMinimumSize(getContentPane().getMinimumSize());
             setLocationRelativeTo(parent);
             setVisible(true);
             pack();
@@ -462,11 +512,35 @@ public class ToolFrame extends JFrame {
                 }
             });
         }
+
+        private JTabbedPane constructTabbedContainer(PanelManager.PanelGroup group)
+        {
+            JTabbedPane tabbedPane = new JTabbedPane();
+            for (JPanel panel : group.getPanels())
+            {
+                tabbedPane.add(panel.getName(), panel);
+            }
+            tabbedPane.setSelectedIndex(group.getSelectedIndex());
+            return tabbedPane;
+        }
         
         private void putBack()
         {
-            remove(panel);
-            tabbedPane1.addTab(panel.getName(), panel);
+            if (panelGroup != null && getContentPane() instanceof JTabbedPane poppedTabbedPane)
+            {
+                poppedTabbedPane.removeAll();
+                remove(poppedTabbedPane);
+                tabbedPane1.addTab(panelGroup.getName(), panelGroup.getPanels()[panelGroup.getSelectedIndex()]);
+                tabbedPane1.setTabComponentAt(tabbedPane1.getTabCount()-1, panelGroup);
+                panelGroup.setContainer(tabbedPane1);
+                panelGroup.containerSelectedTabChanged();
+            }
+            else
+            {
+                Container contentPane = getContentPane();
+                remove(contentPane);
+                tabbedPane1.addTab(contentPane.getName(), contentPane);
+            }
         }
     }
 }

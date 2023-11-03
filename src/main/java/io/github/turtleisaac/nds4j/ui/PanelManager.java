@@ -1,6 +1,8 @@
 package io.github.turtleisaac.nds4j.ui;
 
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +55,17 @@ public abstract class PanelManager
      */
     public abstract void doInfoButtonAction(ActionEvent e);
 
+    public void doToolFrameSelectedTabChangedAction(ChangeEvent e)
+    {
+        for (JPanel panel : getPanels())
+        {
+            if (panel instanceof PanelGroup group)
+            {
+                group.containerSelectedTabChanged();
+            }
+        }
+    }
+
     public void addMenu(JMenu menu)
     {
         tool.getToolFrame().addMenuToBar(menu);
@@ -71,5 +84,96 @@ public abstract class PanelManager
     public boolean wipeAndWriteUnpacked()
     {
         return tool.wipeAndWriteUnpacked();
+    }
+
+    public static class PanelGroup extends JPanel {
+        private final String groupName;
+        private final JPanel[] panels;
+
+        private final JLabel nameLabel;
+        private final JComboBox<String> panelSelector;
+
+        private JTabbedPane container;
+
+        public PanelGroup(String name, JPanel... panels)
+        {
+            this.groupName = name;
+            this.panels = panels;
+            this.nameLabel = new JLabel(name);
+
+            this.panelSelector = new JComboBox<>();
+            for (JPanel panel : panels)
+            {
+                panelSelector.addItem(panel.getName());
+            }
+
+            add(nameLabel);
+            add(panelSelector);
+
+            panelSelector.addActionListener(this::performPanelChange);
+            setBackground(new Color(0,0,0,0));
+        }
+
+        public String getName()
+        {
+            return groupName;
+        }
+
+        protected JPanel[] getPanels()
+        {
+            return panels;
+        }
+
+        protected int getPanelCount()
+        {
+            return panels.length;
+        }
+
+        protected int getSelectedIndex()
+        {
+            return panelSelector.getSelectedIndex();
+        }
+
+        protected void performPanelChange(ActionEvent e)
+        {
+            if (panels.length > 1)
+            {
+                int selected = container.getSelectedIndex();
+                System.out.println(selected);
+                container.removeTabAt(selected);
+                container.insertTab(null, null, panels[panelSelector.getSelectedIndex()], null, selected);
+                container.setTabComponentAt(selected, this);
+                container.setSelectedIndex(selected);
+            }
+        }
+
+        /**
+         * Sets this <code>PanelGroup</code>'s container to the provided <code>JTabbedPane</code>
+         * @param container a <code>JTabbedPane</code>
+         */
+        public void setContainer(JTabbedPane container)
+        {
+            this.container = container;
+        }
+
+        protected void containerSelectedTabChanged()
+        {
+            if (container != null)
+            {
+                int selected = container.getSelectedIndex();
+                if (selected < 0)
+                    return;
+
+                if (container.getTabComponentAt(selected) == this) {
+                    nameLabel.setText(groupName + ":");
+                    add(panelSelector);
+                }
+                else if (panels.length > 1)
+                {
+                    nameLabel.setText(groupName);
+                    remove(panelSelector);
+                }
+            }
+        }
     }
 }

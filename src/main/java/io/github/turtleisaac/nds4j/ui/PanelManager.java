@@ -139,7 +139,6 @@ public abstract class PanelManager
             if (panels.length > 1)
             {
                 int selected = container.getSelectedIndex();
-                System.out.println(selected);
                 container.removeTabAt(selected);
                 container.insertTab(null, null, panels[panelSelector.getSelectedIndex()], null, selected);
                 container.setTabComponentAt(selected, this);

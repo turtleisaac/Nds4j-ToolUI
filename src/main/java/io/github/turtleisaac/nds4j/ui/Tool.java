@@ -42,6 +42,7 @@ public class Tool {
     private String author;
     private JPanel startPanel;
     private ArrayList<JPanel> alternateStartPanels;
+    private Locale defaultLocale;
     private List<Locale> locales;
     private boolean gitEnabled;
 
@@ -189,12 +190,18 @@ public class Tool {
      * @param locale a <code>Locale</code>
      *               <p>It is entirely up to the developer to define multi-language support via Locale in their GUIs through
      *               resource bundles.</p>
+     *               <p>Additionally, it is entirely up to the developer to reload their strings when language is changed,
+     *               or to inform the user of the need to restart their tool for changes to take effect.</p>
+     *               <p>For project-based tools, the project start window will allow for changing of language</p>
      * @return a reference to this object
      * @throws ToolAttributeModificationException if ran after calling <code>init()</code>
      */
     public Tool addLocale(Locale locale)
     {
         testStarted();
+        if (defaultLocale == null) {
+            defaultLocale = Locale.getDefault();
+        }
         locales.add(locale);
         return this;
     }

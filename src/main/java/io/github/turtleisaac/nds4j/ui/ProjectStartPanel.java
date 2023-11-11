@@ -38,6 +38,27 @@ public class ProjectStartPanel extends JPanel {
         ThemeUtils.changeTheme();
     }
 
+    private void changeLanguageButtonPressed(ActionEvent e) {
+        Locale.setDefault(Locale.FRANCE);
+        ResourceBundle bundle = ResourceBundle.getBundle("project_gui");
+
+        button1.setText(bundle.getString("ProjectStartPanel.button1.text"));
+        button2.setText(bundle.getString("ProjectStartPanel.button2.text"));
+//        titleLabel.setText(bundle.getString("ProjectStartPanel.titleLabel.text"));
+//        versionLabel.setText(bundle.getString("ProjectStartPanel.versionLabel.text"));
+//        flavorTextLabel.setText(bundle.getString("ProjectStartPanel.flavorTextLabel.text"));
+        newProjectButton.setText(bundle.getString("ProjectStartPanel.newProjectButton.text"));
+        openProjectButton.setText(bundle.getString("ProjectStartPanel.openProjectButton.text"));
+        changeThemeButton.setText(bundle.getString("ProjectStartPanel.changeThemeButton.text"));
+        changeLanguageButton.setText(bundle.getString("ProjectStartPanel.changeLanguageButton.text"));
+//        authorLabel.setText(bundle.getString("ProjectStartPanel.authorLabel.text"));
+        baseAuthorLabel.setText(bundle.getString("ProjectStartPanel.baseAuthorLabel.text"));
+        Dimension d = getPreferredSize();
+        d.width += 20;
+        tool.getProjectStartFrame().setPreferredSize(d);
+        tool.getProjectStartFrame().setMinimumSize(d);
+    }
+
     private void newProject(ActionEvent e) {
         ProjectCreateDialog dialog = new ProjectCreateDialog(tool);
         dialog.addWindowListener(new WindowAdapter()
@@ -93,6 +114,7 @@ public class ProjectStartPanel extends JPanel {
     {
         return projectInfo;
     }
+
 
     private void initComponents() {
         // JFormDesigner - Component initialization - DO NOT MODIFY  //GEN-BEGIN:initComponents  @formatter:off
@@ -185,6 +207,7 @@ public class ProjectStartPanel extends JPanel {
 
             //---- changeLanguageButton ----
             changeLanguageButton.setText(bundle.getString("ProjectStartPanel.changeLanguageButton.text"));
+            changeLanguageButton.addActionListener(e -> changeLanguageButtonPressed(e));
             panel1.add(changeLanguageButton, "cell 0 2");
         }
         add(panel1, "cell 0 6");

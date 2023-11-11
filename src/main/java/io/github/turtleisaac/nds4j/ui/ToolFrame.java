@@ -404,11 +404,14 @@ public class ToolFrame extends JFrame {
 
             //---- openButton ----
             openButton.setIcon(UIManager.getIcon("Tree.openIcon"));
+            openButton.setText(bundle.getString("ToolFrame.openButton.text"));
             openButton.addActionListener(e -> openProjectButtonPressed(e));
             toolBar1.add(openButton);
+            toolBar1.addSeparator();
 
             //---- saveButton ----
             saveButton.setIcon(UIManager.getIcon("FileView.floppyDriveIcon"));
+            saveButton.setText(bundle.getString("ToolFrame.saveButton.text"));
             saveButton.addActionListener(e -> saveButtonPressed(e));
             toolBar1.add(saveButton);
             toolBar1.addSeparator();

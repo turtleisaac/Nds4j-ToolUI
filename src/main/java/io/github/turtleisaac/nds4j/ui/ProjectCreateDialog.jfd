@@ -14,7 +14,7 @@ new FormModel {
 				add( new FormContainer( "javax.swing.JPanel", new FormLayoutManager( class net.miginfocom.swing.MigLayout ) {
 					"$layoutConstraints": "insets dialog,hidemode 3"
 					"$columnConstraints": "[fill][grow,fill][fill]"
-					"$rowConstraints": "[][][][][]"
+					"$rowConstraints": "[][][][][][][]"
 				} ) {
 					name: "contentPanel"
 					add( new FormComponent( "javax.swing.JLabel" ) {
@@ -71,12 +71,18 @@ new FormModel {
 					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
 						"value": "cell 2 3"
 					} )
+					add( new FormComponent( "javax.swing.JRadioButton" ) {
+						name: "gitRadioButton"
+						"text": new FormMessage( null, "ProjectCreateDialog.gitRadioButton.text" )
+					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
+						"value": "cell 1 4 2 1"
+					} )
 					add( new FormComponent( "javax.swing.JLabel" ) {
 						name: "resultLabel"
 						"text": new FormMessage( null, "ProjectCreateDialog.resultLabel.text" )
 						"font": new com.jformdesigner.model.SwingDerivedFont( null, 2, 0, false )
 					}, new FormLayoutConstraints( class net.miginfocom.layout.CC ) {
-						"value": "cell 0 4 3 1"
+						"value": "cell 0 5 3 1"
 					} )
 				}, new FormLayoutConstraints( class java.lang.String ) {
 					"value": "Center"

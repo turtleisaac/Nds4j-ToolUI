@@ -19,6 +19,10 @@ public class FileUtils
      */
     public static final String projectFileName = "Projectfile";
     /**
+     * The name of the folder within a project directory which contains the unpacked ROM data
+     */
+    public static final String unpackedRomFolderName = "rom";
+    /**
      * The accepted file extensions for Nintendo DS ROMs
      */
     public static final String[] ndsExtensions = {".nds", ".srl"};
@@ -70,7 +74,7 @@ public class FileUtils
      */
     public static String getProjectUnpackedRomPath(String projectPath)
     {
-        return Path.of(projectPath, "rom").toString();
+        return Path.of(projectPath, unpackedRomFolderName).toString();
     }
 
 

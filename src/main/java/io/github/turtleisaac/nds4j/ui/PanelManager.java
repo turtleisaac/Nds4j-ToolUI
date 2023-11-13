@@ -81,9 +81,24 @@ public abstract class PanelManager
         return tool.getToolFrame().getMenu(name);
     }
 
+    /**
+     * This is to be used for a project-based tool saving changes which are currently stored in memory back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     */
     public boolean wipeAndWriteUnpacked()
     {
-        return tool.wipeAndWriteUnpacked();
+        return tool.wipeAndWriteUnpacked(null);
+    }
+
+    /**
+     * This is to be used for a project-based tool saving changes which are currently stored in memory back to disk,
+     * <p>and creating a commit in the process </p>
+     * @param commitMessage the <code>String</code> to use as the commit message for the commit associated with this action
+     * @return a <code>boolean</code> representing whether the action was a success
+     */
+    public boolean wipeAndWriteUnpacked(String commitMessage)
+    {
+        return tool.wipeAndWriteUnpacked(commitMessage);
     }
 
     public static class PanelGroup extends JPanel {
@@ -119,7 +134,7 @@ public abstract class PanelManager
             return groupName;
         }
 
-        protected JPanel[] getPanels()
+        public JPanel[] getPanels()
         {
             return panels;
         }

@@ -15,6 +15,10 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import net.miginfocom.swing.*;
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.CommitCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
 
 /**
  * @author turtleisaac
@@ -148,6 +152,15 @@ public class ProjectCreateDialog extends JDialog {
             File projectFile = new File(FileUtils.getProjectfilePath(projectDir.getAbsolutePath()));
             if (!projectFile.createNewFile())
                 throw new RuntimeException("Failed to write " + FileUtils.projectFileName);
+            if (gitRadioButton.isSelected())
+            {
+                Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call();
+                AddCommand add = git.add();
+                add.addFilepattern(FileUtils.unpackedRomFolderName).call();
+                add.addFilepattern(FileUtils.projectFileName);
+                CommitCommand commit = git.commit();
+                commit.setMessage("Initial commit").call();
+            }
         }
         catch(IOException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -156,6 +169,10 @@ public class ProjectCreateDialog extends JDialog {
         catch(RuntimeException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             throw ex;
+        }
+        catch(GitAPIException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Git Initialization Error", JOptionPane.ERROR_MESSAGE);
+            throw new RuntimeException(ex);
         }
 
         dispose();
@@ -179,6 +196,7 @@ public class ProjectCreateDialog extends JDialog {
         baseRomLabel = new JLabel();
         baseRomField = new JTextField();
         baseRomButton = new JButton();
+        gitRadioButton = new JRadioButton();
         resultLabel = new JLabel();
         buttonBar = new JPanel();
         okButton = new JButton();
@@ -203,6 +221,8 @@ public class ProjectCreateDialog extends JDialog {
                     "[grow,fill]" +
                     "[fill]",
                     // rows
+                    "[]" +
+                    "[]" +
                     "[]" +
                     "[]" +
                     "[]" +
@@ -245,10 +265,14 @@ public class ProjectCreateDialog extends JDialog {
                 baseRomButton.addActionListener(e -> baseRomButtonPressed(e));
                 contentPanel.add(baseRomButton, "cell 2 3");
 
+                //---- gitRadioButton ----
+                gitRadioButton.setText(bundle.getString("ProjectCreateDialog.gitRadioButton.text"));
+                contentPanel.add(gitRadioButton, "cell 1 4 2 1");
+
                 //---- resultLabel ----
                 resultLabel.setText(bundle.getString("ProjectCreateDialog.resultLabel.text"));
                 resultLabel.setFont(resultLabel.getFont().deriveFont(resultLabel.getFont().getStyle() | Font.ITALIC));
-                contentPanel.add(resultLabel, "cell 0 4 3 1");
+                contentPanel.add(resultLabel, "cell 0 5 3 1");
             }
             dialogPane.add(contentPanel, BorderLayout.CENTER);
 
@@ -298,6 +322,7 @@ public class ProjectCreateDialog extends JDialog {
     private JLabel baseRomLabel;
     private JTextField baseRomField;
     private JButton baseRomButton;
+    private JRadioButton gitRadioButton;
     private JLabel resultLabel;
     private JPanel buttonBar;
     private JButton okButton;

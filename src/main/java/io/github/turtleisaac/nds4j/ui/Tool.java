@@ -9,10 +9,10 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
@@ -20,6 +20,9 @@ import java.util.prefs.Preferences;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolAttributeModificationException;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolCreationException;
 import io.github.turtleisaac.nds4j.NintendoDsRom;
+import org.eclipse.jgit.api.CommitCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.*;
 
 /**
  * Provides a generalized framework for development of Nintendo DS hacking tools which operate on Nintendo DS ROM files.
@@ -349,7 +352,7 @@ public class Tool {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
         }
 
-        startGit();
+        testGitAllowed();
 
         setLookAndFeel();
         switch (type) {
@@ -369,29 +372,12 @@ public class Tool {
         }
     }
 
-    private void startGit()
+    private void testGitAllowed()
     {
-        if (gitEnabled)
+        if (gitEnabled && type == ProgramType.ROM)
         {
-            if (type == ProgramType.ROM)
-            {
-                System.err.println("[WARNING]: This tool is configured to support git, but git is only available for project-based tools.");
-                gitEnabled = false;
-                return;
-            }
-
-            try
-            {
-                Process pb = new ProcessBuilder("git", "--version").start();
-                int exitCode = pb.waitFor();
-                if (exitCode != 0)
-                    gitEnabled = false;
-            }
-            catch(IOException | InterruptedException e)
-            {
-                System.err.println("[WARNING]: This tool is configured to support git, but git is not installed on this system.");
-                gitEnabled = false;
-            }
+            System.err.println("[WARNING]: This tool is configured to support git, but git is only available for project-based tools.");
+            gitEnabled = false;
         }
     }
 
@@ -435,6 +421,10 @@ public class Tool {
 
         if (ThemeUtils.themeCount() <= 1) {
             panel.removeThemeButton();
+        }
+
+        if (locales.isEmpty()) {
+            panel.removeLanguageButton();
         }
 
         projectStartFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -658,18 +648,38 @@ public class Tool {
         return sb.toString();
     }
 
-    public boolean wipeAndWriteUnpacked()
+    public boolean wipeAndWriteUnpacked(String commitMessage)
     {
-        if (!FileUtils.clearDirectory(new File(FileUtils.getProjectUnpackedRomPath(path))))
-            return false;
+        String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
+        for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
+        {
+            if (!FileUtils.clearDirectory(Path.of(unpackedRomPath, filename.getName()).toFile()))
+                return false;
+        }
 
         try
         {
-            rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
+            if (gitEnabled)
+            {
+                rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
+                Git git = Git.open(new File(path));
+                CommitCommand commit = git.commit();
+                if (commitMessage == null)
+                    commitMessage = String.format("%s changes", name);
+                commit.setMessage(commitMessage).call();
+            }
         }
-        catch(IOException e) {
+        catch (IOException e) {
+            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
             throw new RuntimeException(e);
         }
+        catch (GitAPIException e) {
+            if (toolFrame != null) {
+                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+            }
+            throw new RuntimeException(e);
+        }
+
         return true;
     }
 
@@ -771,7 +781,7 @@ public class Tool {
         if (projectPath == null)
             return null;
 
-        rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        rom = NintendoDsRom.fromUnpacked(projectPath);
         return performValidation(parentComponent, projectPath);
     }
 

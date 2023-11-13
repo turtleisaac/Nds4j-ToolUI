@@ -76,6 +76,11 @@ public class ProjectCreateDialog extends JDialog {
                 update();
             }
         });
+
+        if (!tool.isGitEnabled())
+        {
+            contentPanel.remove(gitRadioButton);
+        }
     }
 
     private void setIcons()
@@ -154,12 +159,12 @@ public class ProjectCreateDialog extends JDialog {
                 throw new RuntimeException("Failed to write " + FileUtils.projectFileName);
             if (gitRadioButton.isSelected())
             {
-                Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call();
-                AddCommand add = git.add();
-                add.addFilepattern(FileUtils.unpackedRomFolderName).call();
-                add.addFilepattern(FileUtils.projectFileName);
-                CommitCommand commit = git.commit();
-                commit.setMessage("Initial commit").call();
+                Thread gitThread = getGitThread(projectDir);
+                tool.setGitThread(gitThread);
+            }
+            else
+            {
+                tool.setGitEnabledInternal(false);
             }
         }
         catch(IOException ex) {
@@ -170,12 +175,28 @@ public class ProjectCreateDialog extends JDialog {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             throw ex;
         }
-        catch(GitAPIException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Git Initialization Error", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(ex);
-        }
 
         dispose();
+    }
+
+    private Thread getGitThread(File projectDir)
+    {
+        Thread gitThread = new Thread(() -> {
+            try (Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call()) {
+                tool.setGit(git);
+                AddCommand add = git.add();
+                add.addFilepattern(".").call();
+                CommitCommand commit = git.commit();
+                commit.setMessage("Initial commit").call();
+            }
+            catch (GitAPIException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage(), "Git Commit Error", JOptionPane.ERROR_MESSAGE);
+                throw new RuntimeException(ex);
+            }
+            tool.setGitThread(null);
+        });
+        gitThread.start();
+        return gitThread;
     }
 
     protected boolean wasProjectCreated() {return projectCreated;}
@@ -267,6 +288,7 @@ public class ProjectCreateDialog extends JDialog {
 
                 //---- gitRadioButton ----
                 gitRadioButton.setText(bundle.getString("ProjectCreateDialog.gitRadioButton.text"));
+                gitRadioButton.setActionCommand(bundle.getString("ProjectCreateDialog.gitRadioButton.text"));
                 contentPanel.add(gitRadioButton, "cell 1 4 2 1");
 
                 //---- resultLabel ----

@@ -23,6 +23,7 @@ import io.github.turtleisaac.nds4j.NintendoDsRom;
 import org.eclipse.jgit.api.CommitCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.*;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
 
 /**
  * Provides a generalized framework for development of Nintendo DS hacking tools which operate on Nintendo DS ROM files.
@@ -61,6 +62,8 @@ public class Tool {
     // internal usage only
     private JFrame projectStartFrame;
     private ToolFrame toolFrame;
+    private Git git;
+    private Thread gitThread;
 
     private NintendoDsRom rom;
     private JsonNode info;
@@ -576,6 +579,16 @@ public class Tool {
         return info;
     }
 
+    public boolean isGitEnabled()
+    {
+        return gitEnabled;
+    }
+
+    protected void setGitEnabledInternal(boolean gitEnabled)
+    {
+        this.gitEnabled = gitEnabled;
+    }
+
     /**
      * Gets a list of the compatible game codes for this <code>Tool</code>
      * @return a <code>List</code><<code>String</code>> containing the compatible game codes.
@@ -594,6 +607,16 @@ public class Tool {
     protected ToolFrame getToolFrame()
     {
         return toolFrame;
+    }
+
+    protected void setGit(Git git)
+    {
+        this.git = git;
+    }
+
+    protected void setGitThread(Thread gitThread)
+    {
+        this.gitThread = gitThread;
     }
 
     /**
@@ -650,6 +673,12 @@ public class Tool {
 
     public boolean wipeAndWriteUnpacked(String commitMessage)
     {
+        if (gitEnabled && gitThread != null)
+        {
+            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
         String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
         for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
         {
@@ -659,24 +688,42 @@ public class Tool {
 
         try
         {
+            rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
             if (gitEnabled)
             {
-                rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
-                Git git = Git.open(new File(path));
-                CommitCommand commit = git.commit();
-                if (commitMessage == null)
-                    commitMessage = String.format("%s changes", name);
-                commit.setMessage(commitMessage).call();
+                gitThread = new Thread(() -> {
+                    try {
+                        if (git == null)
+                            git = Git.open(new File(path));
+                        git.add().addFilepattern(".").call();
+                        CommitCommand commit = git.commit();
+                        String message = commitMessage;
+                        if (message == null)
+                            message = String.format("%s changes", name);
+                        commit.setMessage(message).call();
+                    }
+                    catch (RepositoryNotFoundException e) {
+                        gitEnabled = false;
+                        gitThread = null;
+                        return;
+                    }
+                    catch (IOException e) {
+                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                        throw new RuntimeException(e);
+                    }
+                    catch (GitAPIException e) {
+                        if (toolFrame != null) {
+                            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                        throw new RuntimeException(e);
+                    }
+                    gitThread = null;
+                });
+                gitThread.start();
             }
         }
         catch (IOException e) {
             JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(e);
-        }
-        catch (GitAPIException e) {
-            if (toolFrame != null) {
-                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-            }
             throw new RuntimeException(e);
         }
 
@@ -781,7 +828,7 @@ public class Tool {
         if (projectPath == null)
             return null;
 
-        rom = NintendoDsRom.fromUnpacked(projectPath);
+        rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
         return performValidation(parentComponent, projectPath);
     }
 

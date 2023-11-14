@@ -76,7 +76,6 @@ public class ToolFrame extends JFrame {
     protected void addToolPanels(PanelManager manager)
     {
         panelManagers.add(manager);
-//        panelGroupMap.computeIfAbsent(manager, );
         for (JPanel panel : manager.getPanels()) {
             if (panel instanceof PanelManager.PanelGroup group)
             {

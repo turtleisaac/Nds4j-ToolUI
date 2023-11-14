@@ -116,11 +116,21 @@ public abstract class PanelManager
             this.panels = panels;
             this.nameLabel = new JLabel(name);
 
+            Dimension largestNeeded = new Dimension();
             this.panelSelector = new JComboBox<>();
             for (JPanel panel : panels)
             {
+                Dimension panelPreferredSize = panel.getPreferredSize();
+                if (largestNeeded.height < panelPreferredSize.height)
+                    largestNeeded.height = panelPreferredSize.height;
+                if (largestNeeded.width < panelPreferredSize.width)
+                    largestNeeded.width = panelPreferredSize.width;
+
                 panelSelector.addItem(panel.getName());
             }
+
+            for (JPanel panel : panels)
+                panel.setMinimumSize(largestNeeded);
 
             add(nameLabel);
             add(panelSelector);

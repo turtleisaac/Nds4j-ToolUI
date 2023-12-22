@@ -203,6 +203,19 @@ public class ProjectCreateDialog extends JDialog {
 
     protected String getProjectPath() {return projectPath;}
 
+    private void helpButtonActionPerformed(ActionEvent e) {
+        ResourceBundle bundle = ResourceBundle.getBundle("project_gui");
+
+        String helpText = bundle.getString("ProjectCreateDialog.projectNameLabel.text") + " " +
+                bundle.getString("ProjectCreateDialog.HelpDialog.projectName.text") + "\n\n" +
+                bundle.getString("ProjectCreateDialog.parentFolderLabel.text") + " " +
+                bundle.getString("ProjectCreateDialog.HelpDialog.parentFolder.text") + "\n\n" +
+                bundle.getString("ProjectCreateDialog.baseRomLabel.text") + " " +
+                bundle.getString("ProjectCreateDialog.HelpDialog.baseRom.text");
+
+        JOptionPane.showMessageDialog(this, helpText, bundle.getString("ProjectCreateDialog.HelpDialog.title"), JOptionPane.INFORMATION_MESSAGE);
+    }
+
     private void initComponents() {
         // JFormDesigner - Component initialization - DO NOT MODIFY  //GEN-BEGIN:initComponents  @formatter:off
         // Generated using JFormDesigner non-commercial license
@@ -322,6 +335,7 @@ public class ProjectCreateDialog extends JDialog {
 
                 //---- helpButton ----
                 helpButton.setText(bundle.getString("ProjectCreateDialog.helpButton.text"));
+                helpButton.addActionListener(e -> helpButtonActionPerformed(e));
                 buttonBar.add(helpButton, "cell 2 0");
             }
             dialogPane.add(buttonBar, BorderLayout.SOUTH);

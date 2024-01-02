@@ -7,8 +7,10 @@ package io.github.turtleisaac.nds4j.ui;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
 import javax.swing.*;
 import javax.swing.event.*;
 
@@ -250,15 +252,59 @@ public class ToolFrame extends JFrame {
             }
         }
 
+        Lock saveLock = tool.getSaveLock();
+        Lock gitLock = tool.getGitLock();
+
+        awaitLockRelease(e, saveLock);
+        awaitLockRelease(e, gitLock);
+
         if (!unsaved) {
             dispose();
-            return;
+            System.exit(0);
+        }
+        else
+        {
+            int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", "PokEditor", JOptionPane.YES_NO_OPTION);
+            if (result == JOptionPane.YES_OPTION) {
+                dispose();
+            }
         }
 
+        System.exit(0);
+    }
 
-        int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", "PokEditor", JOptionPane.YES_NO_OPTION);
-        if(result == JOptionPane.YES_OPTION) {
-            dispose();
+    private void awaitLockRelease(WindowEvent e, Lock lock)
+    {
+        if (!lock.tryLock())
+        {
+            try
+            {
+                System.err.println("Waiting for a lock to release before the program can close.");
+
+                JOptionPane pane = new JOptionPane();
+                pane.setMessage("Waiting for a save-related operation to complete. Please standby.");
+                pane.setMessageType(JOptionPane.WARNING_MESSAGE);
+                JDialog dialog = pane.createDialog(e.getWindow(), "Please wait");
+
+                SwingUtilities.invokeAndWait(() -> {
+                    dialog.setModal(false);
+                    dialog.setVisible(true);
+                    dialog.toFront();
+                });
+
+                lock.lock();
+            }
+            catch(InvocationTargetException | InterruptedException exception) {
+
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        }
+        else
+        {
+            lock.unlock();
         }
     }
 

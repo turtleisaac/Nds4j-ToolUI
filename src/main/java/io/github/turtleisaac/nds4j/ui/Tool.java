@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -62,8 +64,11 @@ public class Tool {
     // internal usage only
     private JFrame projectStartFrame;
     private ToolFrame toolFrame;
+
     private Git git;
     private Thread gitThread;
+    private Lock saveLock = new ReentrantLock();
+    private Lock gitLock = new ReentrantLock();
 
     private NintendoDsRom rom;
     private JsonNode info;
@@ -619,6 +624,16 @@ public class Tool {
         this.gitThread = gitThread;
     }
 
+    protected Lock getSaveLock()
+    {
+        return saveLock;
+    }
+
+    public Lock getGitLock()
+    {
+        return gitLock;
+    }
+
     /**
      * Performs tests to ensure the user-provided ROM is supported by this <code>Tool</code>
      * @param rom a <code>NintendoDsRom</code> representation of the user-provided ROM
@@ -673,39 +688,48 @@ public class Tool {
 
     public boolean wipeAndWriteUnpacked(String commitMessage)
     {
-        if (gitEnabled && gitThread != null)
+        if (gitEnabled && !gitLock.tryLock())
         {
-            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error Error", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
             return false;
         }
 
-        String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
-        for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
-        {
-            if (!FileUtils.clearDirectory(Path.of(unpackedRomPath, filename.getName()).toFile()))
-                return false;
-        }
+        // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
+        gitLock.unlock();
+
+        saveLock.lock();
 
         try
         {
+            System.out.println("Save locked");
+
+            String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
+            for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
+            {
+                if (!FileUtils.clearDirectory(Path.of(unpackedRomPath, filename.getName()).toFile()))
+                    return false;
+            }
+
             rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
             if (gitEnabled)
             {
                 gitThread = new Thread(() -> {
+                    gitLock.lock();
                     try {
+                        Thread.sleep(10000);
                         if (git == null)
                             git = Git.open(new File(path));
                         git.add().addFilepattern(".").call();
                         CommitCommand commit = git.commit();
                         String message = commitMessage;
                         if (message == null)
-                            message = String.format("%s changes", name);
+                            message = String.format("%s %s changes", name, version);
+                        else
+                            message = String.format("(%s %s) %s", name, version, message);
                         commit.setMessage(message).call();
                     }
                     catch (RepositoryNotFoundException e) {
                         gitEnabled = false;
-                        gitThread = null;
-                        return;
                     }
                     catch (IOException e) {
                         JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
@@ -717,14 +741,24 @@ public class Tool {
                         }
                         throw new RuntimeException(e);
                     }
-                    gitThread = null;
+                    catch(InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    finally {
+                        gitLock.unlock();
+                    }
                 });
+
                 gitThread.start();
             }
         }
         catch (IOException e) {
             JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
             throw new RuntimeException(e);
+        }
+        finally {
+            saveLock.unlock();
+            System.out.println("Save unlocked");
         }
 
         return true;

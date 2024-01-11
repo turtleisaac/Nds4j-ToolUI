@@ -91,6 +91,14 @@ public class ThemeUtils
      * A symbol representing a refresh/reload operation
      */
     public static final FlatSVGIcon reloadIcon;
+    /**
+     * A symbol representing a file import operation
+     */
+    public static final FlatSVGIcon fileImportIcon;
+    /**
+     * A symbol representing a file export operation
+     */
+    public static final FlatSVGIcon fileExportIcon;
 
     static {
         try {
@@ -108,6 +116,8 @@ public class ThemeUtils
             zoomInIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-in.svg"));
             zoomOutIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-out.svg"));
             reloadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/refresh.svg"));
+            fileImportIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/file-import.svg"));
+            fileExportIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/file-export.svg"));
 
             leftIcon.setColorFilter(iconColorFilter);
             rightIcon.setColorFilter(iconColorFilter);
@@ -123,6 +133,8 @@ public class ThemeUtils
             zoomInIcon.setColorFilter(iconColorFilter);
             zoomOutIcon.setColorFilter(iconColorFilter);
             reloadIcon.setColorFilter(iconColorFilter);
+            fileImportIcon.setColorFilter(iconColorFilter);
+            fileExportIcon.setColorFilter(iconColorFilter);
         }
         catch(IOException e) {
             throw new RuntimeException(e);

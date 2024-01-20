@@ -6,12 +6,16 @@ package io.github.turtleisaac.nds4j.ui;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.*;
 import javax.swing.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.formdev.flatlaf.util.SystemInfo;
-import io.github.turtleisaac.nds4j.NintendoDsRom;
+import io.github.turtleisaac.nds4j.framework.Buffer;
 import net.miginfocom.swing.*;
 
 public class ProjectStartPanel extends JPanel {
@@ -19,7 +23,7 @@ public class ProjectStartPanel extends JPanel {
     private Tool tool;
 
     private String projectPath;
-    private JsonNode projectInfo;
+    private ObjectNode projectInfo;
     private boolean projectOpened;
 
     private boolean languageButtonRemoved = false;
@@ -77,6 +81,7 @@ public class ProjectStartPanel extends JPanel {
 
     private void openProjectButtonPressed(ActionEvent e) {
         String projectPath = tool.selectAndValidateProject(this);
+
         if (projectPath != null)
             prepareForToolWindowStart(projectPath);
     }
@@ -85,6 +90,20 @@ public class ProjectStartPanel extends JPanel {
     {
         projectOpened = true;
         this.projectPath = projectPath;
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            projectInfo = (ObjectNode) objectMapper.readTree(new String(Buffer.readFile(Paths.get(projectPath, FileUtils.projectFileName)), StandardCharsets.UTF_8));
+        }
+        catch (JsonProcessingException e) {
+            JOptionPane.showMessageDialog(this, "A fatal error occurred while reading data:\n" + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            throw new RuntimeException(e);
+        } catch(ClassCastException ignored) {
+        } finally {
+            if (projectInfo == null)
+            {
+                projectInfo = objectMapper.createObjectNode();
+            }
+        }
         tool.getProjectStartFrame().dispose();
     }
 
@@ -108,9 +127,9 @@ public class ProjectStartPanel extends JPanel {
 
     /**
      * Gets the contents of the Projectfile for the opened project
-     * @return a <code>JsonNode</code> containing the contents of the opened project's Projectfile
+     * @return a <code>ObjectNode</code> containing the contents of the opened project's Projectfile
      */
-    public JsonNode getProjectInfo()
+    public ObjectNode getProjectInfo()
     {
         return projectInfo;
     }

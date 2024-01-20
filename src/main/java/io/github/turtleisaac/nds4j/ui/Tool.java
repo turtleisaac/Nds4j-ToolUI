@@ -1,6 +1,6 @@
 package io.github.turtleisaac.nds4j.ui;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.formdev.flatlaf.util.SystemInfo;
 
 import javax.swing.*;
@@ -71,7 +71,7 @@ public class Tool {
     private Lock gitLock = new ReentrantLock();
 
     private NintendoDsRom rom;
-    private JsonNode info;
+    private ObjectNode info;
 
     private Tool() {
         alternateStartPanels = new ArrayList<>();
@@ -577,9 +577,9 @@ public class Tool {
 
     /**
      * Gets the contents of this <code>Tool</code>'s Projectfile, if one exists, in JSON format
-     * @return a <code>JsonNode</code>
+     * @return a <code>ObjectNode</code>
      */
-    public JsonNode getInfo()
+    public ObjectNode getInfo()
     {
         return info;
     }

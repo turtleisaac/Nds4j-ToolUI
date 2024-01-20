@@ -1,9 +1,14 @@
 package io.github.turtleisaac.nds4j.ui;
 
+import io.github.turtleisaac.nds4j.framework.BinaryWriter;
+import io.github.turtleisaac.nds4j.framework.Buffer;
+
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileView;
+import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -101,6 +106,56 @@ public class FileUtils
             }
         }
         return directory.delete();
+    }
+
+    public static void promptLocationAndWriteFile(Component parent, String operationKey, byte[] data, String description, String extension) throws IOException
+    {
+        String lastPath = Tool.preferences.get(operationKey, null);
+
+        if (lastPath == null) {
+            lastPath = System.getProperty("user.dir");
+        }
+
+        JFileChooser fc = new JFileChooser(lastPath);
+        fc.setAcceptAllFileFilterUsed(false);
+        fc.setDialogTitle("Export file");
+
+        fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fc.setFileFilter(new ExtensionFilter(description, extension));
+        int returnVal = fc.showSaveDialog(parent);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File selected = fc.getSelectedFile();
+            if (!selected.getAbsolutePath().contains(extension))
+                selected = new File(selected.getAbsolutePath() + extension);
+
+            Tool.preferences.put(operationKey, selected.getAbsolutePath());
+            BinaryWriter writer = new BinaryWriter(selected);
+            writer.write(data);
+            writer.close();
+        }
+    }
+
+    public static byte[] promptLocationAndReadFile(Component parent, String operationKey, String description, String extension) throws IOException
+    {
+        String lastPath = Tool.preferences.get(operationKey, null);
+
+        if (lastPath == null) {
+            lastPath = System.getProperty("user.dir");
+        }
+
+        JFileChooser fc = new JFileChooser(lastPath);
+        fc.setAcceptAllFileFilterUsed(false);
+        fc.setDialogTitle("Import file");
+
+        fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fc.setFileFilter(new ExtensionFilter(description, extension));
+        int returnVal = fc.showOpenDialog(parent);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File selected = fc.getSelectedFile();
+            Tool.preferences.put(operationKey, selected.getAbsolutePath());
+            return Buffer.readFile(selected.getAbsolutePath());
+        }
+        return null;
     }
 
 

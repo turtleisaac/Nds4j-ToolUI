@@ -10,6 +10,7 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
@@ -19,6 +20,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 
+import io.github.turtleisaac.nds4j.framework.BinaryWriter;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolAttributeModificationException;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolCreationException;
 import io.github.turtleisaac.nds4j.NintendoDsRom;
@@ -686,71 +688,13 @@ public class Tool {
         return sb.toString();
     }
 
-    public boolean wipeAndWriteUnpacked(String commitMessage)
+    public boolean writeModifiedFile(String pathWithinRom)
     {
-        if (gitEnabled && !gitLock.tryLock())
-        {
-            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
-            return false;
-        }
-
-        // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
-        gitLock.unlock();
-
         saveLock.lock();
 
-        try
-        {
-            System.out.println("Save locked");
-
-            String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
-            for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
-            {
-                if (!FileUtils.clearDirectory(Path.of(unpackedRomPath, filename.getName()).toFile()))
-                    return false;
-            }
-
-            rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
-            if (gitEnabled)
-            {
-                gitThread = new Thread(() -> {
-                    gitLock.lock();
-                    try {
-                        Thread.sleep(10000);
-                        if (git == null)
-                            git = Git.open(new File(path));
-                        git.add().addFilepattern(".").call();
-                        CommitCommand commit = git.commit();
-                        String message = commitMessage;
-                        if (message == null)
-                            message = String.format("%s %s changes", name, version);
-                        else
-                            message = String.format("(%s %s) %s", name, version, message);
-                        commit.setMessage(message).call();
-                    }
-                    catch (RepositoryNotFoundException e) {
-                        gitEnabled = false;
-                    }
-                    catch (IOException e) {
-                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-                        throw new RuntimeException(e);
-                    }
-                    catch (GitAPIException e) {
-                        if (toolFrame != null) {
-                            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-                        }
-                        throw new RuntimeException(e);
-                    }
-                    catch(InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    finally {
-                        gitLock.unlock();
-                    }
-                });
-
-                gitThread.start();
-            }
+        try {
+            System.out.println(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile().getAbsolutePath());
+            BinaryWriter.writeFile(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile(), rom.getFileByName(pathWithinRom));
         }
         catch (IOException e) {
             JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
@@ -763,6 +707,141 @@ public class Tool {
 
         return true;
     }
+
+    public boolean commit(String commitMessage)
+    {
+        if (gitEnabled && !gitLock.tryLock())
+        {
+            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+
+        // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
+        gitLock.unlock();
+
+        if (gitEnabled)
+        {
+            gitThread = new Thread(() -> {
+                gitLock.lock();
+                System.out.println("Git locked");
+                try {
+                    Thread.sleep(10000);
+                    if (git == null)
+                        git = Git.open(new File(path));
+                    git.add().addFilepattern(".").call();
+                    CommitCommand commit = git.commit();
+                    String message = commitMessage;
+                    if (message == null)
+                        message = String.format("%s %s changes", name, version);
+                    else
+                        message = String.format("(%s %s) %s", name, version, message);
+                    commit.setMessage(message).call();
+                }
+                catch (RepositoryNotFoundException e) {
+                    gitEnabled = false;
+                }
+                catch (IOException e) {
+                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                    throw new RuntimeException(e);
+                }
+                catch (GitAPIException e) {
+                    if (toolFrame != null) {
+                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+                    }
+                    throw new RuntimeException(e);
+                }
+                catch(InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                finally {
+                    gitLock.unlock();
+                    System.out.println("Git unlocked");
+                }
+            });
+
+            gitThread.start();
+        }
+
+        return true;
+    }
+
+//    public boolean wipeAndWriteUnpacked(String commitMessage)
+//    {
+//        if (gitEnabled && !gitLock.tryLock())
+//        {
+//            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
+//            return false;
+//        }
+//
+//        // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
+//        gitLock.unlock();
+//
+//        saveLock.lock();
+//
+//        try
+//        {
+//            System.out.println("Save locked");
+//
+//            String unpackedRomPath = FileUtils.getProjectUnpackedRomPath(path);
+//            for (NintendoDsRom.UNPACKED_FILENAMES filename : NintendoDsRom.UNPACKED_FILENAMES.values())
+//            {
+//                if (!FileUtils.clearDirectory(Path.of(unpackedRomPath, filename.getName()).toFile()))
+//                    return false;
+//            }
+//
+//            rom.unpack(FileUtils.getProjectUnpackedRomPath(path));
+//            if (gitEnabled)
+//            {
+//                gitThread = new Thread(() -> {
+//                    gitLock.lock();
+//                    try {
+//                        Thread.sleep(10000);
+//                        if (git == null)
+//                            git = Git.open(new File(path));
+//                        git.add().addFilepattern(".").call();
+//                        CommitCommand commit = git.commit();
+//                        String message = commitMessage;
+//                        if (message == null)
+//                            message = String.format("%s %s changes", name, version);
+//                        else
+//                            message = String.format("(%s %s) %s", name, version, message);
+//                        commit.setMessage(message).call();
+//                    }
+//                    catch (RepositoryNotFoundException e) {
+//                        gitEnabled = false;
+//                    }
+//                    catch (IOException e) {
+//                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+//                        throw new RuntimeException(e);
+//                    }
+//                    catch (GitAPIException e) {
+//                        if (toolFrame != null) {
+//                            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+//                        }
+//                        throw new RuntimeException(e);
+//                    }
+//                    catch(InterruptedException e) {
+//                        throw new RuntimeException(e);
+//                    }
+//                    finally {
+//                        gitLock.unlock();
+//                    }
+//                });
+//
+//                gitThread.start();
+//            }
+//        }
+//        catch (IOException e) {
+//            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+//            throw new RuntimeException(e);
+//        }
+//        finally {
+//            saveLock.unlock();
+//            System.out.println("Save unlocked");
+//        }
+//
+//        return true;
+//    }
 
     /**
      * Opens a JFileChooser configured for the user to select a Nintendo DS ROM to open, then

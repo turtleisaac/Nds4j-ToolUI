@@ -514,12 +514,12 @@ public class Tool {
     private void handleToolbarIfSupported()
     {
         final Taskbar taskbar = Taskbar.getTaskbar();
-        if (icon != null) {
+        if (icon != null && taskbar != null) {
             try {
                 //set icon for macOS (and other systems which do support this method)
                 taskbar.setIconImage(icon);
             } catch (final UnsupportedOperationException e) {
-                System.out.println("[WARNING]: The OS does not support: 'taskbar.setIconImage'");
+                System.out.println("[WARNING]: The OS does not support: 'taskbar.setIconImage'. This should not affect program usage in any way and can be ignored.");
             } catch (final SecurityException e) {
                 System.out.println("[WARNING]: There was a security exception for: 'taskbar.setIconImage'");
             }

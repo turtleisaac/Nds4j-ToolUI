@@ -181,6 +181,21 @@ public class ToolFrame extends JFrame {
         JOptionPane.showMessageDialog(this, "Not yet implemented", "Sorry", JOptionPane.ERROR_MESSAGE);
     }
 
+    private void openRecentButtonPressed(ActionEvent e) {
+        // TODO add your code here
+        JOptionPane.showMessageDialog(this, "Not yet implemented", "Sorry", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void importRomButtonPressed(ActionEvent e) {
+        // TODO add your code here
+        JOptionPane.showMessageDialog(this, "Not yet implemented", "Sorry", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void exportRomButtonPressed(ActionEvent e) {
+        // just use the same logic as the button already existing outside the menu bar
+        saveButtonPressed(e);
+    }
+
     private void infoButtonPressed(ActionEvent e) {
         // TODO support for multiple PanelManager instances
         if(panelManagers.size() == 1) {
@@ -367,19 +382,23 @@ public class ToolFrame extends JFrame {
 
                 //---- menuItem1 ----
                 menuItem1.setText(bundle.getString("ToolFrame.menuItem1.text"));
+                menuItem1.addActionListener(e -> openProjectButtonPressed(e));
                 fileMenu.add(menuItem1);
 
                 //---- menuItem2 ----
                 menuItem2.setText(bundle.getString("ToolFrame.menuItem2.text"));
+                menuItem2.addActionListener(e -> openRecentButtonPressed(e));
                 fileMenu.add(menuItem2);
                 fileMenu.addSeparator();
 
                 //---- menuItem3 ----
                 menuItem3.setText(bundle.getString("ToolFrame.menuItem3.text"));
+                menuItem3.addActionListener(e -> importRomButtonPressed(e));
                 fileMenu.add(menuItem3);
 
                 //---- menuItem4 ----
                 menuItem4.setText(bundle.getString("ToolFrame.menuItem4.text"));
+                menuItem4.addActionListener(e -> exportRomButtonPressed(e));
                 fileMenu.add(menuItem4);
             }
             menuBar1.add(fileMenu);

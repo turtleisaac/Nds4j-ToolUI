@@ -1,4 +1,4 @@
-JFDML JFormDesigner: "8.0.5.0.268" Java: "17.0.8" encoding: "UTF-8"
+JFDML JFormDesigner: "8.2.4.0.393" Java: "21.0.7" encoding: "UTF-8"
 
 new FormModel {
 	"i18n.autoExternalize": true
@@ -93,10 +93,12 @@ new FormModel {
 					add( new FormComponent( "javax.swing.JMenuItem" ) {
 						name: "menuItem1"
 						"text": new FormMessage( null, "ToolFrame.menuItem1.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "openProjectButtonPressed", true ) )
 					} )
 					add( new FormComponent( "javax.swing.JMenuItem" ) {
 						name: "menuItem2"
 						"text": new FormMessage( null, "ToolFrame.menuItem2.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "openRecentButtonPressed", true ) )
 					} )
 					add( new FormComponent( "javax.swing.JPopupMenu$Separator" ) {
 						name: "separator1"
@@ -104,10 +106,12 @@ new FormModel {
 					add( new FormComponent( "javax.swing.JMenuItem" ) {
 						name: "menuItem3"
 						"text": new FormMessage( null, "ToolFrame.menuItem3.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "importRomButtonPressed", true ) )
 					} )
 					add( new FormComponent( "javax.swing.JMenuItem" ) {
 						name: "menuItem4"
 						"text": new FormMessage( null, "ToolFrame.menuItem4.text" )
+						addEvent( new FormEvent( "java.awt.event.ActionListener", "actionPerformed", "exportRomButtonPressed", true ) )
 					} )
 				} )
 				add( new FormContainer( "javax.swing.JMenu", new FormLayoutManager( class javax.swing.JMenu ) ) {

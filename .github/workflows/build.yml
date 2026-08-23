@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # This module compiles at source/target 20.
+          java-version: '21'
+          cache: maven
+
+      # Nds4j is not on Maven Central at the version this module depends on, so it has to be
+      # built from source. Prefer a branch of the same name when one exists: a change that
+      # spans both repositories is developed on matching branches, and testing this module
+      # against a stale Nds4j would report a failure that does not exist (or hide a real one).
+      - name: Resolve Nds4j branch
+        id: nds4j
+        run: |
+          ref="${{ github.head_ref || github.ref_name }}"
+          if git ls-remote --exit-code --heads https://github.com/turtleisaac/Nds4j.git "$ref" >/dev/null 2>&1; then
+            echo "Building against matching Nds4j branch: $ref"
+          else
+            echo "No Nds4j branch named '$ref'; falling back to main"
+            ref=main
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Nds4j
+        uses: actions/checkout@v4
+        with:
+          repository: turtleisaac/Nds4j
+          ref: ${{ steps.nds4j.outputs.ref }}
+          path: .upstream/Nds4j
+
+      - name: Install Nds4j
+        run: mvn -B -ntp -q install -DskipTests -f .upstream/Nds4j/pom.xml
+
+      - name: Build and test
+        # The Swing tests construct components, so the JVM must not look for a display.
+        run: mvn -B -ntp verify -Djava.awt.headless=true
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/**'
+          if-no-files-found: ignore

@@ -1,6 +1,5 @@
 package io.github.turtleisaac.nds4j.ui;
 
-import io.github.turtleisaac.nds4j.framework.BinaryWriter;
 import io.github.turtleisaac.nds4j.framework.Buffer;
 
 import javax.swing.*;
@@ -9,10 +8,13 @@ import javax.swing.filechooser.FileView;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+import java.util.Locale;
 
 /**
  * Contains data and methods which assist in the disk access operations of a <code>Tool</code>
@@ -57,9 +59,8 @@ public class FileUtils
 
     protected static String getExtension(File f)
     {
-        if (f.getName().length() > 1)
-            return f.getName().substring(f.getName().lastIndexOf("."));
-        return null;
+        int i = f.getName().lastIndexOf('.');
+        return (i > 0 && i < f.getName().length() - 1) ? f.getName().substring(i) : null;
     }
 
     /**
@@ -90,13 +91,21 @@ public class FileUtils
      */
     protected static boolean clearDirectory(File directory)
     {
+        if (directory == null || directory.getPath().isBlank())
+            return false;
+
         if (directory.isDirectory())
         {
-            for (File subfile : Objects.requireNonNull(directory.listFiles()))
+            File[] subfiles = directory.listFiles();
+            if (subfiles == null) // the directory could not be read
+                return false;
+
+            for (File subfile : subfiles)
             {
                 if (subfile.isDirectory())
                 {
-                    clearDirectory(subfile);
+                    if (!clearDirectory(subfile))
+                        return false;
                 }
                 else
                 {
@@ -108,7 +117,50 @@ public class FileUtils
         return directory.delete();
     }
 
-    public static void promptLocationAndWriteFile(Component parent, String operationKey, byte[] data, String description, String extension) throws IOException
+    /**
+     * Writes the provided data to the given file without ever truncating the existing one - the data is written
+     * to a sibling temporary file which is then moved into place, so a failure part-way through leaves the
+     * original file intact.
+     * @param target a <code>Path</code> to the file to write
+     * @param data a <code>byte[]</code> containing the data to write
+     * @throws IOException if an error occurs while writing
+     */
+    protected static void atomicWrite(Path target, byte[] data) throws IOException
+    {
+        if (data == null)
+            throw new IOException("No data was provided to write to " + target);
+
+        Path parent = target.getParent();
+        if (parent != null)
+            Files.createDirectories(parent);
+
+        Path temp = Files.createTempFile(parent != null ? parent : Path.of("."), target.getFileName().toString(), ".tmp");
+        try {
+            Files.write(temp, data);
+            try {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            }
+            catch (AtomicMoveNotSupportedException e) {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(temp);
+            throw e;
+        }
+    }
+
+    /**
+     * Prompts the user for a location to write the provided data to, then writes it there
+     * @param parent determines the <code>Frame</code> in which the dialog is displayed
+     * @param operationKey a <code>String</code> containing the key under which the last used directory is stored
+     * @param data a <code>byte[]</code> containing the data to write
+     * @param description a <code>String</code> describing the file type
+     * @param extension a <code>String</code> containing the file extension (including the "dot")
+     * @return the <code>File</code> which was written to, or <code>null</code> if the user cancelled
+     * @throws IOException if an error occurs while writing
+     */
+    public static File promptLocationAndWriteFile(Component parent, String operationKey, byte[] data, String description, String extension) throws IOException
     {
         String lastPath = Tool.preferences.get(operationKey, null);
 
@@ -125,14 +177,36 @@ public class FileUtils
         int returnVal = fc.showSaveDialog(parent);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            if (!selected.getAbsolutePath().contains(extension))
+            if (!selected.getAbsolutePath().toLowerCase(Locale.ROOT).endsWith(extension.toLowerCase(Locale.ROOT)))
                 selected = new File(selected.getAbsolutePath() + extension);
 
-            Tool.preferences.put(operationKey, selected.getAbsolutePath());
-            BinaryWriter writer = new BinaryWriter(selected);
-            writer.write(data);
-            writer.close();
+            if (!confirmOverwrite(parent, selected))
+                return null;
+
+            File parentDir = selected.getParentFile();
+            if (parentDir != null)
+                Tool.preferences.put(operationKey, parentDir.getAbsolutePath());
+
+            atomicWrite(selected.toPath(), data);
+            return selected;
         }
+        return null;
+    }
+
+    /**
+     * If the provided file already exists, asks the user whether they want to overwrite it
+     * @param parent determines the <code>Frame</code> in which the dialog is displayed
+     * @param target a <code>File</code> which is about to be written to
+     * @return a <code>boolean</code> representing whether the write is allowed to proceed
+     */
+    protected static boolean confirmOverwrite(Component parent, File target)
+    {
+        if (target == null || !target.exists())
+            return true;
+
+        return JOptionPane.showConfirmDialog(parent,
+                "\"" + target.getName() + "\" already exists.\nDo you want to replace it?",
+                "Confirm Overwrite", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION;
     }
 
     public static byte[] promptLocationAndReadFile(Component parent, String operationKey, String description, String extension) throws IOException
@@ -152,7 +226,9 @@ public class FileUtils
         int returnVal = fc.showOpenDialog(parent);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            Tool.preferences.put(operationKey, selected.getAbsolutePath());
+            File parentDir = selected.getParentFile();
+            if (parentDir != null)
+                Tool.preferences.put(operationKey, parentDir.getAbsolutePath());
             return Buffer.readFile(selected.getAbsolutePath());
         }
         return null;
@@ -184,9 +260,12 @@ public class FileUtils
                 }
             }
             else if (f.isDirectory()) {
-                List<String> fileNames = Arrays.stream(f.listFiles()).map(File::getName).toList();
-                if (fileNames.contains(projectFileName)) {
-                    type = "Nintendo DS Project";
+                File[] contents = f.listFiles();
+                if (contents != null) {
+                    List<String> fileNames = Arrays.stream(contents).map(File::getName).toList();
+                    if (fileNames.contains(projectFileName)) {
+                        type = "Nintendo DS Project";
+                    }
                 }
             }
 
@@ -209,9 +288,12 @@ public class FileUtils
                 }
             }
             else if (f.isDirectory()) {
-                List<String> fileNames = Arrays.stream(f.listFiles()).map(File::getName).toList();
-                if (fileNames.contains(projectFileName)) {
-                    icon = ThemeUtils.gamepadIcon;
+                File[] contents = f.listFiles();
+                if (contents != null) {
+                    List<String> fileNames = Arrays.stream(contents).map(File::getName).toList();
+                    if (fileNames.contains(projectFileName)) {
+                        icon = ThemeUtils.gamepadIcon;
+                    }
                 }
             }
 
@@ -241,13 +323,13 @@ public class FileUtils
         @Override
         public boolean accept(File f)
         {
+            if (f.isDirectory())
+                return true;
+
+            String name = f.getName().toLowerCase(Locale.ROOT);
             for (String str : extensions)
             {
-                if (f.getName().endsWith(str))
-                    return true;
-                else if (f.getName().endsWith(str))
-                    return true;
-                else if (f.isDirectory())
+                if (name.endsWith(str.toLowerCase(Locale.ROOT)))
                     return true;
             }
             return false;

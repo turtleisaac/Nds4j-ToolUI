@@ -8,8 +8,11 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -118,7 +121,9 @@ public class ProjectCreateDialog extends JDialog {
 
     private void baseRomButtonPressed(ActionEvent e) {
         String romPath = tool.selectAndValidateRom(this);
-        baseRomField.setText(romPath);
+        // a null return means the user cancelled or picked an unsupported ROM, so keep the previous selection
+        if (romPath != null)
+            baseRomField.setText(romPath);
         attemptEnableOkButton();
     }
 
@@ -146,43 +151,107 @@ public class ProjectCreateDialog extends JDialog {
 
     private void okButtonPressed(ActionEvent e) {
         File projectDir = Path.of(parentFolderField.getText(), projectNameField.getText()).toFile();
+        JDialog progressDialog = createProgressDialog();
 
-        try {
-            if (!projectDir.mkdir())
-                throw new RuntimeException("Failed to create project directory: " + projectDir.getAbsolutePath());
+        okButton.setEnabled(false);
+        cancelButton.setEnabled(false);
 
-            tool.getRom().unpack(FileUtils.getProjectUnpackedRomPath(projectDir.getAbsolutePath()));
-            projectCreated = true;
-            projectPath = projectDir.getAbsolutePath();
-            File projectFile = new File(FileUtils.getProjectfilePath(projectDir.getAbsolutePath()));
-            if (!projectFile.createNewFile())
-                throw new RuntimeException("Failed to write " + FileUtils.projectFileName);
-            if (gitRadioButton.isSelected())
+        // unpacking a ROM writes tens of thousands of files, so it must not be done on the EDT
+        new SwingWorker<Void, Void>()
+        {
+            @Override
+            protected Void doInBackground() throws Exception
             {
-                Thread gitThread = getGitThread(projectDir);
-                tool.setGitThread(gitThread);
-            }
-            else
-            {
-                tool.setGitEnabledInternal(false);
-            }
-        }
-        catch(IOException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(ex);
-        }
-        catch(RuntimeException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            throw ex;
-        }
+                if (!projectDir.mkdir())
+                    throw new IOException("Failed to create project directory: " + projectDir.getAbsolutePath());
 
-        dispose();
+                try {
+                    tool.getRom().unpack(FileUtils.getProjectUnpackedRomPath(projectDir.getAbsolutePath()));
+
+                    File projectFile = new File(FileUtils.getProjectfilePath(projectDir.getAbsolutePath()));
+                    if (!projectFile.createNewFile())
+                        throw new IOException("Failed to write " + FileUtils.projectFileName);
+                    Files.write(projectFile.toPath(), "{}".getBytes(StandardCharsets.UTF_8));
+                }
+                catch (Exception | Error ex) {
+                    // a half-created project would make this project name unusable forever, so roll it back
+                    FileUtils.clearDirectory(projectDir);
+                    throw ex;
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void done()
+            {
+                progressDialog.dispose();
+
+                try {
+                    get();
+                }
+                catch(InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    allowRetry();
+                    return;
+                }
+                catch(ExecutionException ex) {
+                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                    JOptionPane.showMessageDialog(ProjectCreateDialog.this, cause.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    allowRetry();
+                    return;
+                }
+
+                if (gitRadioButton.isSelected())
+                {
+                    Thread gitThread = getGitThread(projectDir);
+                    tool.setGitThread(gitThread);
+                }
+                else
+                {
+                    tool.setGitEnabledInternal(false);
+                }
+
+                projectPath = projectDir.getAbsolutePath();
+                projectCreated = true;
+                dispose();
+            }
+        }.execute();
+
+        progressDialog.setVisible(true);
+    }
+
+    private void allowRetry()
+    {
+        cancelButton.setEnabled(true);
+        setResultText();
+        attemptEnableOkButton();
+    }
+
+    private JDialog createProgressDialog()
+    {
+        JDialog progressDialog = new JDialog(this, "Creating Project", ModalityType.APPLICATION_MODAL);
+        progressDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+
+        JPanel panel = new JPanel(new MigLayout("insets 15", "[grow,fill]", "[][]"));
+        panel.add(new JLabel("Unpacking the ROM into the new project. Please standby."), "cell 0 0");
+        panel.add(progressBar, "cell 0 1");
+
+        progressDialog.setContentPane(panel);
+        progressDialog.pack();
+        progressDialog.setLocationRelativeTo(this);
+        return progressDialog;
     }
 
     private Thread getGitThread(File projectDir)
     {
         Thread gitThread = new Thread(() -> {
-            try (Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call()) {
+            // the handle is handed off to the Tool for later commits, so it must not be closed here
+            try {
+                Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call();
                 tool.setGit(git);
                 AddCommand add = git.add();
                 add.addFilepattern(".").call();

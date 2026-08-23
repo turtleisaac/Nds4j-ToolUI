@@ -6,10 +6,9 @@ package io.github.turtleisaac.nds4j.ui;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.Lock;
 import javax.swing.*;
 import javax.swing.event.*;
@@ -39,6 +38,8 @@ public class ToolFrame extends JFrame {
         poppedPanelMap = new HashMap<>();
         panelGroupMap = new HashMap<>();
         tabsButton.setSelected(true);
+        // closing is handled entirely by thisWindowClosing, which is able to cancel the exit
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
         macOsSpacer = Box.createHorizontalStrut(70);
         if (SystemInfo.isMacOS) {
@@ -97,10 +98,18 @@ public class ToolFrame extends JFrame {
             popMenu.add(popItem);
             popItem.addActionListener(e -> {
                 if(((AbstractButton) e.getSource()).getModel().isSelected()) {
-                    poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel));
+                    poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel, popItem));
                 }
                 else {
-                    poppedPanelMap.get(panel).dispose();
+                    PoppedPanelFrame popped = poppedPanelMap.get(panel);
+                    if (popped != null) {
+                        // the panel has to be put back before the frame holding it is destroyed
+                        popped.putBack();
+                        popped.dispose();
+                    }
+                    else {
+                        poppedPanelMap.remove(panel);
+                    }
                 }
             });
         }
@@ -168,12 +177,34 @@ public class ToolFrame extends JFrame {
         if(outputPath == null) {
             return;
         }
-        try {
-            tool.getRom().saveToFile(outputPath, true);
-        }
-        catch(IOException exception) {
-            throw new RuntimeException(exception);
-        }
+
+        // rebuilding the ROM can take a while, so it must not be done on the EDT
+        saveButton.setEnabled(false);
+        new SwingWorker<Void, Void>()
+        {
+            @Override
+            protected Void doInBackground() throws Exception
+            {
+                tool.getRom().saveToFile(outputPath, true);
+                return null;
+            }
+
+            @Override
+            protected void done()
+            {
+                saveButton.setEnabled(true);
+                try {
+                    get();
+                }
+                catch(InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                }
+                catch(ExecutionException exception) {
+                    Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
+                    JOptionPane.showMessageDialog(ToolFrame.this, cause.getMessage(), "ROM Export Failed", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private void openProjectButtonPressed(ActionEvent e) {
@@ -267,60 +298,91 @@ public class ToolFrame extends JFrame {
             }
         }
 
+        if (unsaved)
+        {
+            int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", tool.getName(), JOptionPane.YES_NO_OPTION);
+            if (result != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+
+        awaitPendingOperationsThenExit(e);
+    }
+
+    private void awaitPendingOperationsThenExit(WindowEvent e)
+    {
         Lock saveLock = tool.getSaveLock();
         Lock gitLock = tool.getGitLock();
 
-        awaitLockRelease(e, saveLock);
-        awaitLockRelease(e, gitLock);
-
-        if (!unsaved) {
-            dispose();
-            System.exit(0);
-        }
-        else
+        if (!tool.isCommitPending() && isAvailable(saveLock) && isAvailable(gitLock))
         {
-            int result = JOptionPane.showConfirmDialog(this, "You have unsaved changes. Are you sure you want to exit?", "PokEditor", JOptionPane.YES_NO_OPTION);
-            if (result == JOptionPane.YES_OPTION) {
-                dispose();
-            }
+            exit();
+            return;
         }
 
+        System.err.println("Waiting for a lock to release before the program can close.");
+
+        JOptionPane pane = new JOptionPane();
+        pane.setMessage("Waiting for a save-related operation to complete. Please standby.");
+        pane.setMessageType(JOptionPane.WARNING_MESSAGE);
+        JDialog dialog = pane.createDialog(e.getWindow(), "Please wait");
+        dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        dialog.setModal(false);
+
+        // waiting has to happen off of the EDT, otherwise the dialog above can never paint
+        new SwingWorker<Void, Void>()
+        {
+            @Override
+            protected Void doInBackground() throws Exception
+            {
+                awaitLockRelease(saveLock);
+                // a commit can be scheduled without having acquired the git lock yet, so waiting on the
+                // lock alone is not enough to know the commit has finished
+                do {
+                    awaitLockRelease(gitLock);
+                    if (tool.isCommitPending())
+                        Thread.sleep(100);
+                } while (tool.isCommitPending());
+                return null;
+            }
+
+            @Override
+            protected void done()
+            {
+                dialog.dispose();
+                exit();
+            }
+        }.execute();
+
+        dialog.setVisible(true);
+    }
+
+    private void exit()
+    {
+        // the Projectfile is only ever written back to disk by the framework, so do it before exiting
+        tool.writeProjectInfo();
+        dispose();
         System.exit(0);
     }
 
-    private void awaitLockRelease(WindowEvent e, Lock lock)
+    /**
+     * Tests whether the given lock is currently free, without holding onto it
+     */
+    private static boolean isAvailable(Lock lock)
     {
         if (!lock.tryLock())
-        {
-            try
-            {
-                System.err.println("Waiting for a lock to release before the program can close.");
+            return false;
+        lock.unlock();
+        return true;
+    }
 
-                JOptionPane pane = new JOptionPane();
-                pane.setMessage("Waiting for a save-related operation to complete. Please standby.");
-                pane.setMessageType(JOptionPane.WARNING_MESSAGE);
-                JDialog dialog = pane.createDialog(e.getWindow(), "Please wait");
-
-                SwingUtilities.invokeAndWait(() -> {
-                    dialog.setModal(false);
-                    dialog.setVisible(true);
-                    dialog.toFront();
-                });
-
-                lock.lock();
-            }
-            catch(InvocationTargetException | InterruptedException exception) {
-
-            }
-            finally
-            {
-                lock.unlock();
-            }
-        }
-        else
-        {
-            lock.unlock();
-        }
+    /**
+     * Blocks until the given lock can be acquired, then immediately releases it
+     */
+    private static void awaitLockRelease(Lock lock)
+    {
+        lock.lock();
+        lock.unlock();
     }
 
     private void tabbedPane1TabChanged(ChangeEvent e) {
@@ -537,17 +599,27 @@ public class ToolFrame extends JFrame {
     class PoppedPanelFrame extends JFrame
     {
         private final PanelManager.PanelGroup panelGroup;
+        private final JPanel poppedPanel;
+        private final JCheckBoxMenuItem popItem;
+        private boolean putBackCompleted;
 
-        public PoppedPanelFrame(ToolFrame parent, JPanel panel)
+        public PoppedPanelFrame(ToolFrame parent, JPanel panel, JCheckBoxMenuItem popItem)
         {
             super();
 
+            this.poppedPanel = panel;
+            this.popItem = popItem;
+
             JMenuBar menuBar = new JMenuBar();
             JMenuItem putBackMenu = new JMenuItem();
-            putBackMenu.addActionListener(e -> putBack());
+            putBackMenu.addActionListener(e -> {
+                putBack();
+                dispose();
+            });
             menuBar.add(putBackMenu);
 
             setJMenuBar(menuBar);
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
             setTitle(panel.getName());
 
             if (panel instanceof PanelManager.PanelGroup group)
@@ -593,6 +665,10 @@ public class ToolFrame extends JFrame {
         
         private void putBack()
         {
+            if (putBackCompleted)
+                return;
+            putBackCompleted = true;
+
             if (panelGroup != null && getContentPane() instanceof JTabbedPane poppedTabbedPane)
             {
                 poppedTabbedPane.removeAll();
@@ -608,6 +684,11 @@ public class ToolFrame extends JFrame {
                 remove(contentPane);
                 tabbedPane1.addTab(contentPane.getName(), contentPane);
             }
+
+            // keep the menu item and the map in sync with the panel actually being back in the tabbed pane
+            poppedPanelMap.remove(poppedPanel);
+            if (popItem != null)
+                popItem.setSelected(false);
         }
     }
 }

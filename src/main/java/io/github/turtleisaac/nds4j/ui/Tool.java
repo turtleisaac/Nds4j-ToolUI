@@ -1,5 +1,6 @@
 package io.github.turtleisaac.nds4j.ui;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.formdev.flatlaf.util.SystemInfo;
 
@@ -20,7 +21,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 
-import io.github.turtleisaac.nds4j.framework.BinaryWriter;
+import io.github.turtleisaac.nds4j.framework.StringFormatter;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolAttributeModificationException;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolCreationException;
 import io.github.turtleisaac.nds4j.NintendoDsRom;
@@ -39,6 +40,11 @@ public class Tool {
      */
     public static Preferences preferences = Preferences.userNodeForPackage(Tool.class);
 
+    /**
+     * The key under which the user's selected locale is stored in <code>preferences</code>
+     */
+    private static final String LOCALE_PREFERENCE_KEY = "locale";
+
     private boolean started;
     private boolean windowMode;
 
@@ -52,7 +58,7 @@ public class Tool {
     private ArrayList<JPanel> alternateStartPanels;
     private Locale defaultLocale;
     private List<Locale> locales;
-    private boolean gitEnabled;
+    private volatile boolean gitEnabled;
 
     private final List<String> gameCodes;
     private final List<String> gameTitles;
@@ -67,8 +73,9 @@ public class Tool {
     private JFrame projectStartFrame;
     private ToolFrame toolFrame;
 
-    private Git git;
-    private Thread gitThread;
+    private volatile Git git;
+    private volatile Thread gitThread;
+    private volatile boolean commitPending;
     private Lock saveLock = new ReentrantLock();
     private Lock gitLock = new ReentrantLock();
 
@@ -220,6 +227,65 @@ public class Tool {
     }
 
     /**
+     * Gets the locales the user can select between, which is every locale added to this <code>Tool</code>
+     * plus the locale which was active when the first one was added
+     * @return a <code>List</code><<code>Locale</code>>
+     */
+    protected List<Locale> getSelectableLocales()
+    {
+        List<Locale> selectable = new ArrayList<>();
+        if (defaultLocale != null && !locales.contains(defaultLocale))
+            selectable.add(defaultLocale);
+        selectable.addAll(locales);
+        return selectable;
+    }
+
+    /**
+     * Changes the default locale to the next one available to this <code>Tool</code>, then stores the
+     * selection in the user's preferences
+     * @return the newly selected <code>Locale</code>
+     */
+    protected Locale changeLocale()
+    {
+        List<Locale> selectable = getSelectableLocales();
+        if (selectable.isEmpty())
+            return Locale.getDefault();
+
+        int idx = selectable.indexOf(Locale.getDefault());
+        return setLocale(selectable.get((idx + 1) % selectable.size()));
+    }
+
+    /**
+     * Changes the default locale to the provided one, then stores the selection in the user's preferences
+     * @param locale the <code>Locale</code> to change to
+     * @return the provided <code>Locale</code>
+     */
+    protected Locale setLocale(Locale locale)
+    {
+        Locale.setDefault(locale);
+        ResourceBundle.clearCache();
+        preferences.put(LOCALE_PREFERENCE_KEY, locale.toLanguageTag());
+        return locale;
+    }
+
+    /**
+     * Changes the current locale to the saved user preference, if it is one of this <code>Tool</code>'s locales
+     */
+    private void applyPreferredLocale()
+    {
+        String tag = preferences.get(LOCALE_PREFERENCE_KEY, null);
+        if (tag == null)
+            return;
+
+        Locale stored = Locale.forLanguageTag(tag);
+        if (getSelectableLocales().contains(stored))
+        {
+            Locale.setDefault(stored);
+            ResourceBundle.clearCache();
+        }
+    }
+
+    /**
      * Enables Git support for project-based tools.
      * <p></p>
      * @param enabled a <code>boolean</code> representing whether Git mode should be enabled.
@@ -340,8 +406,13 @@ public class Tool {
             throw new ToolCreationException("No panel managers or functions were provided");
         if (!functions.isEmpty() && ! panelManagerSuppliers.isEmpty())
             throw new ToolCreationException("Both panel managers and functions were provided - please only use one type of tool functionality");
-        if (functions.isEmpty() && type == null)
-            throw new ToolCreationException("Program type not specified");
+        if (type == null)
+        {
+            if (functions.isEmpty())
+                throw new ToolCreationException("Program type not specified");
+            // function-based tools operate directly on a packed ROM, so default them accordingly
+            type = ProgramType.ROM;
+        }
         if (functions.isEmpty() && (name == null || name.isEmpty()))
             throw new ToolCreationException("Program name not specified");
         if (functions.isEmpty() && (version == null || version.isEmpty()))
@@ -363,6 +434,7 @@ public class Tool {
         }
 
         testGitAllowed();
+        applyPreferredLocale();
 
         setLookAndFeel();
         switch (type) {
@@ -463,6 +535,7 @@ public class Tool {
     }
 
     private String path;
+    private String projectPath;
 
     /**
      * Starts the window of this <code>Tool</code>
@@ -472,6 +545,8 @@ public class Tool {
     protected void startToolWindow(String path)
     {
         this.path = path;
+        // `path` is the path to the .nds file for ROM-based tools, so only project-based tools have a project directory
+        this.projectPath = (type == ProgramType.PROJECT) ? path : null;
         toolFrame = new ToolFrame(this);
         //todo uncomment
         toolFrame.setTitle(name + " " + version + " " + new File(path).getName());
@@ -513,10 +588,11 @@ public class Tool {
 
     private void handleToolbarIfSupported()
     {
-        final Taskbar taskbar = Taskbar.getTaskbar();
-        if (icon != null && taskbar != null) {
+        if (icon != null && Taskbar.isTaskbarSupported()) {
             try {
                 //set icon for macOS (and other systems which do support this method)
+                // (HeadlessException and UnsupportedOperationException can both be thrown by getTaskbar())
+                final Taskbar taskbar = Taskbar.getTaskbar();
                 taskbar.setIconImage(icon);
             } catch (final UnsupportedOperationException e) {
                 System.out.println("[WARNING]: The OS does not support: 'taskbar.setIconImage'. This should not affect program usage in any way and can be ignored.");
@@ -688,13 +764,31 @@ public class Tool {
         return sb.toString();
     }
 
-    public boolean writeModifiedFile(String pathWithinRom)
+    /**
+     * Gets the path to the directory of the currently open project
+     * @return a <code>String</code> containing the absolute path of the open project directory
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or no project is open
+     */
+    protected String requireProjectPath()
+    {
+        if (type != ProgramType.PROJECT)
+            throw new UnsupportedOperationException("Writing to an unpacked ROM is only supported by project-based tools");
+        if (projectPath == null)
+            throw new UnsupportedOperationException("No project is currently open");
+        return projectPath;
+    }
+
+    private Path unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES section)
+    {
+        return Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()), section.getName());
+    }
+
+    private boolean writeUnpackedSection(Path target, byte[] data)
     {
         saveLock.lock();
 
         try {
-            System.out.println(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile().getAbsolutePath());
-            BinaryWriter.writeFile(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile(), rom.getFileByName(pathWithinRom));
+            FileUtils.atomicWrite(target, data);
         }
         catch (IOException e) {
             JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
@@ -702,32 +796,177 @@ public class Tool {
         }
         finally {
             saveLock.unlock();
-            System.out.println("Save unlocked");
         }
 
         return true;
     }
 
+
+    /**
+     * This is to be used for a project-based tool saving a modified file within the ROM's filesystem back to disk.
+     * @param pathWithinRom a <code>String</code> containing the path of the file within the ROM's filesystem
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public boolean writeModifiedFile(String pathWithinRom)
+    {
+        return writeUnpackedSection(Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+                NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom), rom.getFileByName(pathWithinRom));
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 binary back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public boolean writeModifiedArm9()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM9), rom.getArm9());
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 binary back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public boolean writeModifiedArm7()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM7), rom.getArm7());
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 overlay table back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public boolean writeModifiedY9()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y9), rom.getY9());
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 overlay table back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public boolean writeModifiedY7()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y7), rom.getY7());
+    }
+
+    /**
+     * This is to be used for a project-based tool saving a modified arm9 overlay back to disk.
+     * @param overlayId the ID of the overlay to write
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
+     */
+    public boolean writeModifiedOverlay(int overlayId)
+    {
+        byte[] y9 = rom.getY9();
+        int overlayCount = y9.length / 32;
+
+        if (overlayId < 0 || overlayId >= overlayCount)
+            throw new IndexOutOfBoundsException("Overlay " + overlayId + " does not exist in the loaded ROM");
+
+        // the file ID of an overlay is stored at offset 0x18 of its 32-byte entry in the overlay table
+        int offset = overlayId * 32 + 0x18;
+        int fileId = (y9[offset] & 0xFF) | ((y9[offset + 1] & 0xFF) << 8)
+                | ((y9[offset + 2] & 0xFF) << 16) | ((y9[offset + 3] & 0xFF) << 24);
+
+        Path target = Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+                NintendoDsRom.UNPACKED_FILENAMES.OVERLAY.getName(),
+                StringFormatter.formatOutputString(overlayId, overlayCount, "overlay_", ".bin"));
+
+        return writeUnpackedSection(target, rom.getFile(fileId));
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified icon banner back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
+     *          version of Nds4j does not provide access to the icon banner of a ROM
+     */
+    public boolean writeModifiedBanner()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.BANNER),
+                rom.getIconBanner());
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified ROM header back to disk.
+     * @return a <code>boolean</code> representing whether the action was a success
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
+     *          version of Nds4j does not provide access to the serialized header of a ROM
+     */
+    public boolean writeHeader()
+    {
+        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.HEADER),
+                rom.getHeader());
+    }
+
+    /**
+     * Writes the contents of this <code>Tool</code>'s Projectfile back to disk. Does nothing for non-project-based tools.
+     * @return a <code>boolean</code> representing whether the action was a success
+     */
+    public boolean writeProjectInfo()
+    {
+        if (type != ProgramType.PROJECT || projectPath == null || info == null)
+            return false;
+
+        saveLock.lock();
+
+        try {
+            FileUtils.atomicWrite(Paths.get(FileUtils.getProjectfilePath(projectPath)),
+                    new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsBytes(info));
+        }
+        catch (IOException e) {
+            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Projectfile Write Failed", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        finally {
+            saveLock.unlock();
+        }
+
+        return true;
+    }
+
+    /**
+     * Gets whether a commit has been scheduled and has not yet finished
+     * @return a <code>boolean</code>
+     */
+    public boolean isCommitPending()
+    {
+        return commitPending;
+    }
+
     public boolean commit(String commitMessage)
     {
-        if (gitEnabled && !gitLock.tryLock())
+        writeProjectInfo();
+
+        if (!gitEnabled)
+            return true;
+
+        if (!gitLock.tryLock())
         {
-            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(toolFrame, "Your changes have been saved to disk, but no backup commit was created because a previous commit is still occurring in the background. Try committing again in a few seconds.", "Commit Skipped", JOptionPane.WARNING_MESSAGE);
             return false;
         }
 
         // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
         gitLock.unlock();
 
-        if (gitEnabled)
-        {
-            gitThread = new Thread(() -> {
-                gitLock.lock();
-                System.out.println("Git locked");
+        commitPending = true;
+        gitThread = new Thread(() -> {
+            gitLock.lock();
+            try {
+                Thread.sleep(10000);
+                // the working tree must not be written to while it is being staged, otherwise a partially
+                // written file could be committed
+                saveLock.lock();
                 try {
-                    Thread.sleep(10000);
                     if (git == null)
-                        git = Git.open(new File(path));
+                        git = Git.open(new File(requireProjectPath()));
                     git.add().addFilepattern(".").call();
                     CommitCommand commit = git.commit();
                     String message = commitMessage;
@@ -737,30 +976,34 @@ public class Tool {
                         message = String.format("(%s %s) %s", name, version, message);
                     commit.setMessage(message).call();
                 }
-                catch (RepositoryNotFoundException e) {
-                    gitEnabled = false;
-                }
-                catch (IOException e) {
-                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-                    throw new RuntimeException(e);
-                }
-                catch (GitAPIException e) {
-                    if (toolFrame != null) {
-                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-                    }
-                    throw new RuntimeException(e);
-                }
-                catch(InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
                 finally {
-                    gitLock.unlock();
-                    System.out.println("Git unlocked");
+                    saveLock.unlock();
                 }
-            });
+            }
+            catch (RepositoryNotFoundException e) {
+                gitEnabled = false;
+            }
+            catch (IOException e) {
+                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                throw new RuntimeException(e);
+            }
+            catch (GitAPIException e) {
+                if (toolFrame != null) {
+                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+                }
+                throw new RuntimeException(e);
+            }
+            catch(InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+            finally {
+                commitPending = false;
+                gitLock.unlock();
+            }
+        });
 
-            gitThread.start();
-        }
+        gitThread.start();
 
         return true;
     }
@@ -890,6 +1133,9 @@ public class Tool {
         if (!foundExtension)
             outputPath += FileUtils.ndsExtensions[0];
 
+        if (!FileUtils.confirmOverwrite(null, new File(outputPath)))
+            return null;
+
         return outputPath;
     }
 
@@ -915,7 +1161,9 @@ public class Tool {
 
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            preferences.put(lastPathKey, selected.getParentFile().getAbsolutePath());
+            File parent = selected.getParentFile();
+            if (parent != null)
+                preferences.put(lastPathKey, parent.getAbsolutePath());
             return selected.getAbsolutePath();
         }
 
@@ -941,7 +1189,14 @@ public class Tool {
         if (projectPath == null)
             return null;
 
-        rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        try {
+            rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        }
+        catch (RuntimeException e) {
+            JOptionPane.showMessageDialog(parentComponent, "The unpacked ROM in this project could not be read:\n" + e.getMessage(), "Invalid Project", JOptionPane.ERROR_MESSAGE);
+            rom = null;
+            return null;
+        }
         return performValidation(parentComponent, projectPath);
     }
 
@@ -982,10 +1237,12 @@ public class Tool {
 
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            if (selected.isFile()) {
+            if (selected.isFile() && selected.getParentFile() != null) {
                 selected = selected.getParentFile();
             }
-            preferences.put("openProjectPath", selected.getParentFile().getAbsolutePath());
+            File parent = selected.getParentFile();
+            if (parent != null)
+                preferences.put("openProjectPath", parent.getAbsolutePath());
             return selected.getAbsolutePath();
         }
 

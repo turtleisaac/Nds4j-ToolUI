@@ -8,6 +8,11 @@ import javax.swing.filechooser.FileView;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -118,9 +123,19 @@ public class FileUtils
     }
 
     /**
-     * Writes the provided data to the given file without ever truncating the existing one - the data is written
-     * to a sibling temporary file which is then moved into place, so a failure part-way through leaves the
-     * original file intact.
+     * Writes the provided data to the given file without ever truncating the existing one.
+     * <p>
+     * The data goes to a sibling temporary file, is forced to the storage device, and is then
+     * moved into place, so the target is only ever the old contents or the new ones - never a
+     * half-written mixture, and never empty. A failure part way through leaves the original
+     * intact and removes the temporary file.
+     * <p>
+     * The {@code force} is what makes this durable rather than merely atomic. Without it,
+     * {@link Files#write} returns once the operating system has the data in its page cache and
+     * the rename is journaled while the contents are not - so a power loss can leave a target
+     * that is present, renamed, and empty. That is the outcome this method exists to prevent,
+     * and it costs one flush per file.
+     *
      * @param target a <code>Path</code> to the file to write
      * @param data a <code>byte[]</code> containing the data to write
      * @throws IOException if an error occurs while writing
@@ -134,14 +149,72 @@ public class FileUtils
         if (parent != null)
             Files.createDirectories(parent);
 
-        Path temp = Files.createTempFile(parent != null ? parent : Path.of("."), target.getFileName().toString(), ".tmp");
+        // A symlinked target is written through, not replaced: someone who has pointed a project
+        // file at a decomp tree means the file at the far end, and Files.move would replace the
+        // link itself and leave the real file stale.
+        Path destination = Files.isSymbolicLink(target) ? Files.readSymbolicLink(target) : target;
+        if (!destination.isAbsolute() && parent != null)
+            destination = parent.resolve(destination);
+
+        Path destinationParent = destination.getParent();
+        Path tempDirectory = destinationParent != null ? destinationParent : Path.of(".");
+
+        // The leading dot matters. This file is a sibling of the real ones, and it survives if
+        // the process dies mid-write - which is the very case this method is for. Nds4j lists
+        // these directories back and parses the file names for their IDs, so a visible stray
+        // "overlay_0000.bin1234.tmp" makes the project unopenable, and in rom/data it is counted
+        // as a real file and given an ID, shifting every ID after it. Both call sites there skip
+        // hidden files, so a dot keeps it out of the way entirely.
+        // Files.move only needs the directory to be writable, so a read-only file would be
+        // replaced without complaint. Marking the base ROM read-only is how people protect it,
+        // and the old writer honoured that because it opened the file itself.
+        if (Files.exists(destination) && !Files.isWritable(destination))
+        {
+            throw new IOException(destination + " is read-only, so it has not been modified. "
+                    + "Remove the write protection first if the change is intended.");
+        }
+
+        Path temp = Files.createTempFile(tempDirectory,
+                "." + destination.getFileName().toString(), ".tmp");
         try {
-            Files.write(temp, data);
+            // The permissions of the file being replaced, so the move does not silently hand back
+            // a file that is more private than the one it replaced. Files.move replaces the inode,
+            // so without this every saved file drops to the temporary file's owner-only mode.
+            Set<PosixFilePermission> permissions = null;
             try {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                if (Files.exists(destination))
+                    permissions = Files.getPosixFilePermissions(destination);
+            }
+            catch (UnsupportedOperationException | IOException ignored) {
+                // not a POSIX filesystem, or unreadable - the move will simply keep the default
+            }
+
+            try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING)) {
+                channel.write(ByteBuffer.wrap(data));
+                channel.force(true);
+            }
+
+            if (permissions != null)
+            {
+                try {
+                    Files.setPosixFilePermissions(temp, permissions);
+                }
+                catch (UnsupportedOperationException | IOException ignored) {
+                    // best effort; a wrong mode is worth less than a failed save
+                }
+            }
+
+            try {
+                Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
             }
             catch (AtomicMoveNotSupportedException e) {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+                // The temporary file is a sibling of the destination, so this should be
+                // unreachable. If a filesystem does refuse anyway, say so rather than quietly
+                // completing a move that no longer has the property the caller asked for.
+                throw new IOException("Could not replace " + destination + " atomically. The file"
+                        + " has not been modified.", e);
             }
         }
         catch (IOException | RuntimeException e) {

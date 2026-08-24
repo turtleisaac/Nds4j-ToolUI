@@ -475,6 +475,14 @@ public class Tool {
         else {
             runProvidedFunctions();
             String outputPath = selectRomToExport();
+
+            // null means the user cancelled the file chooser or declined to overwrite. The whole
+            // pipeline has already run by this point, so throwing a NullPointerException at them
+            // discards all of it - and the overwrite prompt makes that a button they are now
+            // routinely offered.
+            if (outputPath == null)
+                return;
+
             try {
                 rom.saveToFile(outputPath, true);
             }

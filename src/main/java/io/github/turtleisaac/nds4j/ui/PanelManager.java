@@ -83,8 +83,7 @@ public abstract class PanelManager
 
 //    /**
 //     * This is to be used for a project-based tool saving changes which are currently stored in memory back to disk.
-//     * @return a <code>boolean</code> representing whether the action was a success
-//     */
+////     */
 //    public boolean wipeAndWriteUnpacked()
 //    {
 //        return tool.wipeAndWriteUnpacked(null);
@@ -94,90 +93,93 @@ public abstract class PanelManager
 //     * This is to be used for a project-based tool saving changes which are currently stored in memory back to disk,
 //     * <p>and creating a commit in the process </p>
 //     * @param commitMessage the <code>String</code> to use as the commit message for the commit associated with this action
-//     * @return a <code>boolean</code> representing whether the action was a success
-//     */
+////     */
 //    public boolean wipeAndWriteUnpacked(String commitMessage)
 //    {
 //        return tool.wipeAndWriteUnpacked(commitMessage);
 //    }
 
     /**
+     * Collects several sections to be written together, so a save spanning more than one file
+     * either happens or does not. Prefer this to a run of the single-section methods below: those
+     * replace each file as they reach it, so a failure part way through leaves the project half
+     * saved.
+     * @return a builder; nothing is written until <code>write()</code> is called
+     * @throws UnsupportedOperationException if the tool is not project-based
+     */
+    public Tool.SaveBatch saveBatch()
+    {
+        return tool.saveBatch();
+    }
+
+    /**
      * This is to be used for a project-based tool saving changes which are currently stored in memory back to disk.
      * @param pathWithinRom a <code>String</code> containing the path of the file within the ROM's filesystem
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedFile(String pathWithinRom)
+    public void writeModifiedFile(String pathWithinRom)
     {
-        return tool.writeModifiedFile(pathWithinRom);
+        tool.writeModifiedFile(pathWithinRom);
     }
 
     /**
      * This is to be used for a project-based tool saving the modified arm9 binary back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedArm9()
+    public void writeModifiedArm9()
     {
-        return tool.writeModifiedArm9();
+        tool.writeModifiedArm9();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified arm7 binary back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedArm7()
+    public void writeModifiedArm7()
     {
-        return tool.writeModifiedArm7();
+        tool.writeModifiedArm7();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified arm9 overlay table back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedY9()
+    public void writeModifiedY9()
     {
-        return tool.writeModifiedY9();
+        tool.writeModifiedY9();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified arm7 overlay table back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedY7()
+    public void writeModifiedY7()
     {
-        return tool.writeModifiedY7();
+        tool.writeModifiedY7();
     }
 
     /**
      * This is to be used for a project-based tool saving a modified arm9 overlay back to disk.
      * @param overlayId the ID of the overlay to write
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedOverlay(int overlayId)
+    public void writeModifiedOverlay(int overlayId)
     {
-        return tool.writeModifiedOverlay(overlayId);
+        tool.writeModifiedOverlay(overlayId);
     }
 
     /**
      * This is to be used for a project-based tool saving the modified icon banner back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeModifiedBanner()
+    public void writeModifiedBanner()
     {
-        return tool.writeModifiedBanner();
+        tool.writeModifiedBanner();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified ROM header back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
-    public boolean writeHeader()
+    public void writeHeader()
     {
-        return tool.writeHeader();
+        tool.writeHeader();
     }
 
     /**
      * This is to be used for a project-based tool saving the contents of the Projectfile back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      */
     public boolean writeProjectInfo()
     {

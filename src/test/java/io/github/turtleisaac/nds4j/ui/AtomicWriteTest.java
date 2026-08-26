@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -359,6 +361,122 @@ class AtomicWriteTest
             Path target = existing(dir, "f.bin");
             assertThatThrownBy(() -> FileUtils.atomicWrite(target, null)).isInstanceOf(IOException.class);
             assertThat(Files.readAllBytes(target)).isEqualTo(OLD);
+        }
+    }
+
+    /**
+     * A save spans many files, and stopping half way through is a corruption of its own: a new
+     * personal.narc beside an old TM table in arm9.bin is not a state the ROM was ever in.
+     * <p>
+     * Failure is induced by a target whose parent cannot be created, because that path does not
+     * depend on file permissions and so exercises the property under root as well - unlike the
+     * class above, which measures something only an ordinary user can observe.
+     */
+    @Nested
+    @DisplayName("a batch of writes")
+    class Batches
+    {
+        /** A destination that cannot be created: its parent is an existing regular file. */
+        private Path unwritable(Path dir) throws IOException
+        {
+            Path blocker = dir.resolve("blocker");
+            Files.write(blocker, new byte[] {1});
+            return blocker.resolve("child.narc");
+        }
+
+        @Test
+        @DisplayName("every file is written when the batch succeeds")
+        void allEntriesAreWritten(@TempDir Path dir) throws IOException
+        {
+            Path a = existing(dir, "personal.narc");
+            Path b = existing(dir, "arm9.bin");
+
+            FileUtils.atomicWriteAll(new LinkedHashMap<>(Map.of(a, NEW, b, NEW)));
+
+            assertThat(Files.readAllBytes(a)).isEqualTo(NEW);
+            assertThat(Files.readAllBytes(b)).isEqualTo(NEW);
+        }
+
+        @Test
+        @DisplayName("one entry failing leaves every other file untouched")
+        void aFailedEntryLeavesTheRestAlone(@TempDir Path dir) throws IOException
+        {
+            Path a = existing(dir, "personal.narc");
+            Path b = existing(dir, "arm9.bin");
+
+            // ordered, and the doomed entry is last: the two good ones are fully staged before
+            // it fails, so this is precisely the case where a write-as-you-go implementation has
+            // already replaced them
+            Map<Path, byte[]> writes = new LinkedHashMap<>();
+            writes.put(a, NEW);
+            writes.put(b, NEW);
+            writes.put(unwritable(dir), NEW);
+
+            assertThatThrownBy(() -> FileUtils.atomicWriteAll(writes)).isInstanceOf(IOException.class);
+
+            assertThat(Files.readAllBytes(a))
+                    .as("a save that could not be completed must not have half happened")
+                    .isEqualTo(OLD);
+            assertThat(Files.readAllBytes(b)).isEqualTo(OLD);
+        }
+
+        @Test
+        @DisplayName("a file the batch would have created does not appear when the batch fails")
+        void aFailedBatchCreatesNothing(@TempDir Path dir) throws IOException
+        {
+            Path fresh = dir.resolve("new.narc");
+
+            Map<Path, byte[]> writes = new LinkedHashMap<>();
+            writes.put(fresh, NEW);
+            writes.put(unwritable(dir), NEW);
+
+            assertThatThrownBy(() -> FileUtils.atomicWriteAll(writes)).isInstanceOf(IOException.class);
+
+            assertThat(Files.exists(fresh))
+                    .as("nothing in a failed batch may be left behind for the next open to read")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("a failed batch leaves no temporary files behind")
+        void aFailedBatchCleansUpItsTemporaries(@TempDir Path dir) throws IOException
+        {
+            Path a = existing(dir, "personal.narc");
+
+            Map<Path, byte[]> writes = new LinkedHashMap<>();
+            writes.put(a, NEW);
+            writes.put(unwritable(dir), NEW);
+
+            assertThatThrownBy(() -> FileUtils.atomicWriteAll(writes)).isInstanceOf(IOException.class);
+
+            // Nds4j lists these directories and parses the names for IDs, so a stray file is not
+            // cosmetic - in rom/data it is counted and shifts every ID after it
+            assertThat(namesIn(dir))
+                    .as("the temporary files staged before the failure must be gone")
+                    .containsExactlyInAnyOrder("personal.narc", "blocker");
+        }
+
+        @Test
+        @DisplayName("a null payload fails the batch before anything is written")
+        void aNullPayloadFailsTheWholeBatch(@TempDir Path dir) throws IOException
+        {
+            Path a = existing(dir, "personal.narc");
+
+            Map<Path, byte[]> writes = new LinkedHashMap<>();
+            writes.put(a, NEW);
+            writes.put(dir.resolve("arm9.bin"), null);
+
+            assertThatThrownBy(() -> FileUtils.atomicWriteAll(writes)).isInstanceOf(IOException.class);
+
+            assertThat(Files.readAllBytes(a)).isEqualTo(OLD);
+            assertThat(namesIn(dir)).containsExactly("personal.narc");
+        }
+
+        @Test
+        @DisplayName("an empty batch does nothing and does not complain")
+        void anEmptyBatchIsANoOp(@TempDir Path dir)
+        {
+            assertThatCode(() -> FileUtils.atomicWriteAll(Map.of())).doesNotThrowAnyException();
         }
     }
 }

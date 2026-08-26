@@ -17,9 +17,11 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Contains data and methods which assist in the disk access operations of a <code>Tool</code>
@@ -142,6 +144,96 @@ public class FileUtils
      */
     protected static void atomicWrite(Path target, byte[] data) throws IOException
     {
+        StagedWrite staged = stage(target, data);
+        try {
+            staged.commit();
+        }
+        catch (IOException | RuntimeException e) {
+            staged.discard();
+            throw e;
+        }
+    }
+
+    /**
+     * Writes every entry as one batch: all of them are staged first, and only once all have been
+     * written and flushed is any of them moved into place.
+     * <p>
+     * This is for a save that spans several files, where finishing half of it is worse than not
+     * starting. A ROM project is exactly that - a new {@code personal.narc} beside an old TM table
+     * in {@code arm9.bin} is a specific corruption, and the caller cannot tell it happened because
+     * the failure arrives from whichever file failed rather than from the save as a whole.
+     * <p>
+     * <b>What this does and does not promise.</b> Staging is where a save actually fails: a full
+     * disk, a bad path, a read-only file, an I/O error. All of that now happens before anything is
+     * visible, and a failure leaves every target exactly as it was. What remains is the sequence
+     * of renames at the end - each is atomic on its own, but the JVM being killed between two of
+     * them still leaves some files new and some old. Closing that needs a journal and a recovery
+     * pass on open, which this is not.
+     *
+     * @param writes the data to write, keyed by target path
+     * @throws IOException if any entry could not be staged, before any file has been replaced; or
+     *         if a rename fails, in which case earlier entries in the batch are already written
+     */
+    protected static void atomicWriteAll(Map<Path, byte[]> writes) throws IOException
+    {
+        if (writes == null)
+            throw new IOException("No writes were provided");
+
+        List<StagedWrite> staged = new ArrayList<>(writes.size());
+        try {
+            for (Map.Entry<Path, byte[]> write : writes.entrySet())
+                staged.add(stage(write.getKey(), write.getValue()));
+        }
+        catch (IOException | RuntimeException e) {
+            // nothing has been moved, so discarding the temporary files leaves every target as it
+            // was - which is the whole point of staging the batch before committing any of it
+            for (StagedWrite pending : staged)
+                pending.discard();
+            throw e;
+        }
+
+        for (StagedWrite pending : staged)
+            pending.commit();
+    }
+
+    /**
+     * A write that has been fully written and flushed to a temporary file beside its destination,
+     * and needs only the rename to take effect.
+     */
+    private record StagedWrite(Path temp, Path destination)
+    {
+        void commit() throws IOException
+        {
+            try {
+                Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            }
+            catch (AtomicMoveNotSupportedException e) {
+                // The temporary file is a sibling of the destination, so this should be
+                // unreachable. If a filesystem does refuse anyway, say so rather than quietly
+                // completing a move that no longer has the property the caller asked for.
+                throw new IOException("Could not replace " + destination + " atomically. The file"
+                        + " has not been modified.", e);
+            }
+        }
+
+        void discard()
+        {
+            try {
+                Files.deleteIfExists(temp);
+            }
+            catch (IOException ignored) {
+                // a stray dot-file is not worth failing a save that has already failed
+            }
+        }
+    }
+
+    /**
+     * Does everything a write needs except the rename: resolves the destination, refuses the cases
+     * that must not be written, and writes and flushes the data to a temporary sibling.
+     */
+    private static StagedWrite stage(Path target, byte[] data) throws IOException
+    {
         if (data == null)
             throw new IOException("No data was provided to write to " + target);
 
@@ -205,17 +297,7 @@ public class FileUtils
                 }
             }
 
-            try {
-                Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE);
-            }
-            catch (AtomicMoveNotSupportedException e) {
-                // The temporary file is a sibling of the destination, so this should be
-                // unreachable. If a filesystem does refuse anyway, say so rather than quietly
-                // completing a move that no longer has the property the caller asked for.
-                throw new IOException("Could not replace " + destination + " atomically. The file"
-                        + " has not been modified.", e);
-            }
+            return new StagedWrite(temp, destination);
         }
         catch (IOException | RuntimeException e) {
             Files.deleteIfExists(temp);

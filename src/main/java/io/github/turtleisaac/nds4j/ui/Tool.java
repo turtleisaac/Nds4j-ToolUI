@@ -15,6 +15,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -76,6 +77,13 @@ public class Tool {
     private volatile Git git;
     private volatile Thread gitThread;
     private volatile boolean commitPending;
+    /**
+     * How long a save waits for a backup commit to finish staging before telling the user it
+     * cannot save yet. Long enough that an ordinary commit is simply waited out, short enough
+     * that the interface never looks hung.
+     */
+    private static final long SAVE_LOCK_TIMEOUT_SECONDS = 15;
+
     private Lock saveLock = new ReentrantLock();
     private Lock gitLock = new ReentrantLock();
 
@@ -791,85 +799,10 @@ public class Tool {
         return Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()), section.getName());
     }
 
-    private boolean writeUnpackedSection(Path target, byte[] data)
-    {
-        saveLock.lock();
-
-        try {
-            FileUtils.atomicWrite(target, data);
-        }
-        catch (IOException e) {
-            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(e);
-        }
-        finally {
-            saveLock.unlock();
-        }
-
-        return true;
-    }
-
-
     /**
-     * This is to be used for a project-based tool saving a modified file within the ROM's filesystem back to disk.
-     * @param pathWithinRom a <code>String</code> containing the path of the file within the ROM's filesystem
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * Resolves the file an overlay is unpacked to, and the ID of that overlay's file in the ROM.
      */
-    public boolean writeModifiedFile(String pathWithinRom)
-    {
-        return writeUnpackedSection(Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
-                NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom), rom.getFileByName(pathWithinRom));
-    }
-
-    /**
-     * This is to be used for a project-based tool saving the modified arm9 binary back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
-     */
-    public boolean writeModifiedArm9()
-    {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM9), rom.getArm9());
-    }
-
-    /**
-     * This is to be used for a project-based tool saving the modified arm7 binary back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
-     */
-    public boolean writeModifiedArm7()
-    {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM7), rom.getArm7());
-    }
-
-    /**
-     * This is to be used for a project-based tool saving the modified arm9 overlay table back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
-     */
-    public boolean writeModifiedY9()
-    {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y9), rom.getY9());
-    }
-
-    /**
-     * This is to be used for a project-based tool saving the modified arm7 overlay table back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
-     */
-    public boolean writeModifiedY7()
-    {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y7), rom.getY7());
-    }
-
-    /**
-     * This is to be used for a project-based tool saving a modified arm9 overlay back to disk.
-     * @param overlayId the ID of the overlay to write
-     * @return a <code>boolean</code> representing whether the action was a success
-     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
-     * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
-     */
-    public boolean writeModifiedOverlay(int overlayId)
+    private Path overlaySectionPath(int overlayId)
     {
         byte[] y9 = rom.getY9();
         int overlayCount = y9.length / 32;
@@ -877,40 +810,239 @@ public class Tool {
         if (overlayId < 0 || overlayId >= overlayCount)
             throw new IndexOutOfBoundsException("Overlay " + overlayId + " does not exist in the loaded ROM");
 
-        // the file ID of an overlay is stored at offset 0x18 of its 32-byte entry in the overlay table
-        int offset = overlayId * 32 + 0x18;
-        int fileId = (y9[offset] & 0xFF) | ((y9[offset + 1] & 0xFF) << 8)
-                | ((y9[offset + 2] & 0xFF) << 16) | ((y9[offset + 3] & 0xFF) << 24);
-
-        Path target = Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+        return Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
                 NintendoDsRom.UNPACKED_FILENAMES.OVERLAY.getName(),
                 StringFormatter.formatOutputString(overlayId, overlayCount, "overlay_", ".bin"));
+    }
 
-        return writeUnpackedSection(target, rom.getFile(fileId));
+    private int overlayFileId(int overlayId)
+    {
+        byte[] y9 = rom.getY9();
+        // the file ID of an overlay is stored at offset 0x18 of its 32-byte entry in the overlay table
+        int offset = overlayId * 32 + 0x18;
+        return (y9[offset] & 0xFF) | ((y9[offset + 1] & 0xFF) << 8)
+                | ((y9[offset + 2] & 0xFF) << 16) | ((y9[offset + 3] & 0xFF) << 24);
+    }
+
+    /**
+     * Takes the save lock, waiting only so long for it.
+     * <p>
+     * A backup commit holds this lock while it stages the working tree, which for a project of
+     * tens of thousands of files takes a while. Blocking on it outright froze the interface with
+     * nothing said - the user clicked save and the application stopped responding. Waiting a
+     * bounded time and then saying what is happening is worse than never blocking and better than
+     * blocking forever, which is the honest position until saving moves off the event thread.
+     *
+     * @throws IllegalStateException if the lock could not be taken in time; nothing has been written
+     */
+    private void lockForSave()
+    {
+        try {
+            if (saveLock.tryLock(SAVE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                return;
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting to save", e);
+        }
+
+        JOptionPane.showMessageDialog(toolFrame,
+                "Nothing has been saved yet: a backup commit is still working through the project's"
+                        + " files, and saving during that would put a half-written project into the"
+                        + " commit. Try again in a few seconds.",
+                "Save Postponed", JOptionPane.WARNING_MESSAGE);
+        throw new IllegalStateException("The save lock is held by a commit in progress");
+    }
+
+    /**
+     * Writes several unpacked sections as one batch, so that a failure part way through leaves the
+     * project as it was rather than half saved.
+     * @return a builder; nothing is written until {@link SaveBatch#write()} is called
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public SaveBatch saveBatch()
+    {
+        requireProjectPath();
+        return new SaveBatch();
+    }
+
+    /**
+     * A set of unpacked sections to be written together.
+     * <p>
+     * A ROM project is not one file, and a save that stops half way is a state the ROM was never
+     * in - a new <code>personal.narc</code> beside an old TM table in <code>arm9.bin</code>.
+     * Collecting the writes first lets all of them be staged before any is moved into place, so
+     * the failures that actually happen - a full disk, a read-only file, a bad path - are found
+     * while everything on disk is still the old version.
+     */
+    public final class SaveBatch
+    {
+        private final Map<Path, byte[]> writes = new LinkedHashMap<>();
+
+        private SaveBatch() {}
+
+        /** @param pathWithinRom the path of the file within the ROM's filesystem */
+        public SaveBatch file(String pathWithinRom)
+        {
+            writes.put(Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+                    NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom),
+                    rom.getFileByName(pathWithinRom));
+            return this;
+        }
+
+        public SaveBatch arm9()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM9), rom.getArm9());
+            return this;
+        }
+
+        public SaveBatch arm7()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM7), rom.getArm7());
+            return this;
+        }
+
+        public SaveBatch y9()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y9), rom.getY9());
+            return this;
+        }
+
+        public SaveBatch y7()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y7), rom.getY7());
+            return this;
+        }
+
+        /**
+         * @param overlayId the ID of the overlay to write
+         * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
+         */
+        public SaveBatch overlay(int overlayId)
+        {
+            writes.put(overlaySectionPath(overlayId), rom.getFile(overlayFileId(overlayId)));
+            return this;
+        }
+
+        public SaveBatch banner()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.BANNER), rom.getIconBanner());
+            return this;
+        }
+
+        public SaveBatch header()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.HEADER), rom.getHeader());
+            return this;
+        }
+
+        /**
+         * Writes every section collected so far. Either all of them are replaced, or - for any
+         * failure that happens while writing - none of them are.
+         * @throws RuntimeException if the batch could not be written; the message has been shown
+         *         to the user already
+         */
+        public void write()
+        {
+            lockForSave();
+
+            try {
+                FileUtils.atomicWriteAll(writes);
+            }
+            catch (IOException e) {
+                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                throw new RuntimeException(e);
+            }
+            finally {
+                saveLock.unlock();
+            }
+        }
+    }
+
+
+    /**
+     * This is to be used for a project-based tool saving a modified file within the ROM's filesystem back to disk.
+     * @param pathWithinRom a <code>String</code> containing the path of the file within the ROM's filesystem
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the file could not be written
+     */
+    public void writeModifiedFile(String pathWithinRom)
+    {
+        saveBatch().file(pathWithinRom).write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 binary back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedArm9()
+    {
+        saveBatch().arm9().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 binary back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedArm7()
+    {
+        saveBatch().arm7().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 overlay table back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedY9()
+    {
+        saveBatch().y9().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 overlay table back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedY7()
+    {
+        saveBatch().y7().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving a modified arm9 overlay back to disk.
+     * @param overlayId the ID of the overlay to write
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
+     * @throws RuntimeException if the overlay could not be written
+     */
+    public void writeModifiedOverlay(int overlayId)
+    {
+        saveBatch().overlay(overlayId).write();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified icon banner back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
      *          version of Nds4j does not provide access to the icon banner of a ROM
+     * @throws RuntimeException if the banner could not be written
      */
-    public boolean writeModifiedBanner()
+    public void writeModifiedBanner()
     {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.BANNER),
-                rom.getIconBanner());
+        saveBatch().banner().write();
     }
 
     /**
      * This is to be used for a project-based tool saving the modified ROM header back to disk.
-     * @return a <code>boolean</code> representing whether the action was a success
      * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
      *          version of Nds4j does not provide access to the serialized header of a ROM
+     * @throws RuntimeException if the header could not be written
      */
-    public boolean writeHeader()
+    public void writeHeader()
     {
-        return writeUnpackedSection(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.HEADER),
-                rom.getHeader());
+        saveBatch().header().write();
     }
 
     /**
@@ -922,7 +1054,15 @@ public class Tool {
         if (type != ProgramType.PROJECT || projectPath == null || info == null)
             return false;
 
-        saveLock.lock();
+        // Bounded like every other save, so a commit staging the working tree cannot freeze the
+        // interface here either. This one reports failure rather than throwing, because unlike
+        // the section writers it has always had a boolean that means something.
+        try {
+            lockForSave();
+        }
+        catch (IllegalStateException e) {
+            return false;
+        }
 
         try {
             FileUtils.atomicWrite(Paths.get(FileUtils.getProjectfilePath(projectPath)),
@@ -969,24 +1109,35 @@ public class Tool {
             gitLock.lock();
             try {
                 Thread.sleep(10000);
-                // the working tree must not be written to while it is being staged, otherwise a partially
-                // written file could be committed
+                // The working tree must not be written to while it is being staged. Not because a
+                // half-written file could be committed - FileUtils writes through a temporary and
+                // renames, so no file is ever visible in a partial state - but because a save
+                // landing mid-staging commits some files new and some old, which is a snapshot of
+                // the project that never existed.
+                //
+                // Held only across staging, which is the part that has to see one consistent tree.
+                // The commit itself writes objects git has already read, so a save during it is
+                // harmless, and releasing first is the difference between a save waiting on one
+                // directory walk and a save waiting on a whole commit. A save that does have to
+                // wait now waits a bounded time and says so, rather than freezing the interface -
+                // see lockForSave.
                 saveLock.lock();
                 try {
                     if (git == null)
                         git = Git.open(new File(requireProjectPath()));
                     git.add().addFilepattern(".").call();
-                    CommitCommand commit = git.commit();
-                    String message = commitMessage;
-                    if (message == null)
-                        message = String.format("%s %s changes", name, version);
-                    else
-                        message = String.format("(%s %s) %s", name, version, message);
-                    commit.setMessage(message).call();
                 }
                 finally {
                     saveLock.unlock();
                 }
+
+                CommitCommand commit = git.commit();
+                String message = commitMessage;
+                if (message == null)
+                    message = String.format("%s %s changes", name, version);
+                else
+                    message = String.format("(%s %s) %s", name, version, message);
+                commit.setMessage(message).call();
             }
             catch (RepositoryNotFoundException e) {
                 gitEnabled = false;

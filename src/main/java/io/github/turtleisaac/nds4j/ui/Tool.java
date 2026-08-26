@@ -1143,7 +1143,14 @@ public class Tool {
                     saveLock.unlock();
                 }
 
-                CommitCommand commit = git.commit();
+                // Never signed. These are automatic local backups, so a signature asserts
+                // nothing about who made the change, and inheriting the user's global signing
+                // config makes their setup decide whether the backup happens at all: with
+                // gpg.format=ssh - which is ordinary now, GitHub supports it - JGit refuses to
+                // commit, and did so with an unchecked exception that escaped the handlers below
+                // and surfaced as "an unexpected error occurred" after every save. The save had
+                // worked; only the backup was lost, and nothing said so.
+                CommitCommand commit = git.commit().setSign(Boolean.FALSE);
                 String message = commitMessage;
                 if (message == null)
                     message = String.format("%s %s changes", name, version);

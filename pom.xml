@@ -22,23 +22,10 @@
             <version>3.2.1</version>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf-intellij-themes -->
-        <dependency>
-            <groupId>com.formdev</groupId>
-            <artifactId>flatlaf-intellij-themes</artifactId>
-            <version>3.2.1</version>
-        </dependency>
-
         <dependency>
             <groupId>com.formdev</groupId>
             <artifactId>flatlaf-extras</artifactId>
             <version>3.2.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.weisj</groupId>
-            <artifactId>jsvg</artifactId>
-            <version>1.2.0</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/com.miglayout/miglayout -->

@@ -40,6 +40,12 @@ class BackupCommitTest
         config.setString("user", null, "name", "A Project Owner");
         config.setString("user", null, "email", "owner@example.com");
         config.setString("gpg", null, "format", "ssh");
+        // Set locally, not inherited. Both of these come from the user's global config in the
+        // wild, and the first version of this test set only the format - so it passed on a
+        // machine whose global config also turned signing on, and proved nothing on one that did
+        // not. That is the same mistake as the defect: behaviour decided by ambient configuration
+        // that the test never states. A fixture has to carry every condition it depends on.
+        config.setBoolean("commit", null, "gpgsign", true);
         config.save();
 
         Files.write(dir.resolve("personal.narc"), new byte[] {1, 2, 3});

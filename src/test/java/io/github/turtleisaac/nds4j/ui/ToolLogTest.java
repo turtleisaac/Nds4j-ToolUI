@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -166,6 +167,12 @@ class ToolLogTest
         // handler's own dialog throws, which re-enters the handler, which prints again. The first
         // version of this wrote 326MB in sixty seconds. A log that can consume a user's disk is a
         // worse failure than the one it was added to diagnose.
+        // Discard the console side before begin() captures it. Ten megabytes has to be written
+        // to reach the cap, and surefire echoes whatever a test prints into the build log - the
+        // first version of this put 40,000 lines into every CI run. The file still receives it
+        // all, which is what is being measured.
+        System.setOut(new PrintStream(OutputStream.nullOutputStream(), true, StandardCharsets.UTF_8));
+
         Path file = ToolLog.begin("TestTool");
         assertThat(file).isNotNull();
 

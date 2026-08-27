@@ -30,12 +30,15 @@ public class ToolFrame extends JFrame {
     private Map<PanelManager, List<PanelManager.PanelGroup>> panelGroupMap;
 
     private Map<JPanel, PoppedPanelFrame> poppedPanelMap;
+    /** Maps each mounted panel to the <code>PanelManager</code> which owns it. */
+    private Map<Component, PanelManager> panelOwnerMap;
 
     protected ToolFrame(Tool tool) {
         initComponents();
         this.tool = tool;
         panelManagers = new ArrayList<>();
         poppedPanelMap = new HashMap<>();
+        panelOwnerMap = new HashMap<>();
         panelGroupMap = new HashMap<>();
         tabsButton.setSelected(true);
         // closing is handled entirely by thisWindowClosing, which is able to cancel the exit
@@ -79,7 +82,7 @@ public class ToolFrame extends JFrame {
     protected void addToolPanels(PanelManager manager)
     {
         panelManagers.add(manager);
-        for (JPanel panel : manager.getPanels()) {
+        for (JPanel panel : manager.panels()) {
             if (panel instanceof PanelManager.PanelGroup group)
             {
                 if (group.getPanelCount() < 1)
@@ -88,17 +91,22 @@ public class ToolFrame extends JFrame {
                 tabbedPane1.setTabComponentAt(tabbedPane1.getTabCount()-1, group);
                 group.setContainer(tabbedPane1);
                 group.containerSelectedTabChanged();
+                for (JPanel groupedPanel : group.getPanels())
+                    panelOwnerMap.put(groupedPanel, manager);
             }
             else
             {
                 tabbedPane1.add(panel.getName(), panel);
             }
 
+            panelOwnerMap.put(panel, manager);
+
             JCheckBoxMenuItem popItem = new JCheckBoxMenuItem(panel.getName());
             popMenu.add(popItem);
             popItem.addActionListener(e -> {
                 if(((AbstractButton) e.getSource()).getModel().isSelected()) {
-                    poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel, popItem));
+                    if (!poppedPanelMap.containsKey(panel))
+                        poppedPanelMap.put(panel, new PoppedPanelFrame(this, panel, popItem));
                 }
                 else {
                     PoppedPanelFrame popped = poppedPanelMap.get(panel);
@@ -228,9 +236,16 @@ public class ToolFrame extends JFrame {
     }
 
     private void infoButtonPressed(ActionEvent e) {
-        // TODO support for multiple PanelManager instances
-        if(panelManagers.size() == 1) {
-            panelManagers.get(0).doInfoButtonAction(e);
+        // Route the action to whichever manager owns the tab the user is looking at, so tools built out of more
+        // than one PanelManager get a working info button too.
+        PanelManager owner = panelOwnerMap.get(tabbedPane1.getSelectedComponent());
+        if (owner != null) {
+            owner.doInfoButtonAction(e);
+            return;
+        }
+
+        for (PanelManager manager : panelManagers) {
+            manager.doInfoButtonAction(e);
         }
     }
 
@@ -601,6 +616,7 @@ public class ToolFrame extends JFrame {
         private final PanelManager.PanelGroup panelGroup;
         private final JPanel poppedPanel;
         private final JCheckBoxMenuItem popItem;
+        private final int originalIndex;
         private boolean putBackCompleted;
 
         public PoppedPanelFrame(ToolFrame parent, JPanel panel, JCheckBoxMenuItem popItem)
@@ -609,9 +625,13 @@ public class ToolFrame extends JFrame {
 
             this.poppedPanel = panel;
             this.popItem = popItem;
+            this.originalIndex = panel instanceof PanelManager.PanelGroup group
+                    ? tabbedPane1.indexOfTabComponent(group)
+                    : tabbedPane1.indexOfComponent(panel);
 
             JMenuBar menuBar = new JMenuBar();
-            JMenuItem putBackMenu = new JMenuItem();
+            // without a label this menu item is invisible, so the popped window has no way back from its own menu
+            JMenuItem putBackMenu = new JMenuItem("Put Back");
             putBackMenu.addActionListener(e -> {
                 putBack();
                 dispose();
@@ -625,7 +645,8 @@ public class ToolFrame extends JFrame {
             if (panel instanceof PanelManager.PanelGroup group)
             {
                 this.panelGroup = group;
-                tabbedPane1.removeTabAt(tabbedPane1.indexOfTabComponent(group));
+                if (originalIndex >= 0)
+                    tabbedPane1.removeTabAt(originalIndex);
                 setContentPane(constructTabbedContainer(group));
             }
             else
@@ -659,7 +680,9 @@ public class ToolFrame extends JFrame {
             {
                 tabbedPane.add(panel.getName(), panel);
             }
-            tabbedPane.setSelectedIndex(group.getSelectedIndex());
+            int selected = group.getSelectedIndex();
+            if (selected >= 0 && selected < tabbedPane.getTabCount())
+                tabbedPane.setSelectedIndex(selected);
             return tabbedPane;
         }
         
@@ -669,21 +692,31 @@ public class ToolFrame extends JFrame {
                 return;
             putBackCompleted = true;
 
+            int index = originalIndex < 0 || originalIndex > tabbedPane1.getTabCount()
+                    ? tabbedPane1.getTabCount()
+                    : originalIndex;
+
             if (panelGroup != null && getContentPane() instanceof JTabbedPane poppedTabbedPane)
             {
+                // carry the selection the user made inside the popped window back into the group
+                int selected = poppedTabbedPane.getSelectedIndex();
                 poppedTabbedPane.removeAll();
-                remove(poppedTabbedPane);
-                tabbedPane1.addTab(panelGroup.getName(), panelGroup.getPanels()[panelGroup.getSelectedIndex()]);
-                tabbedPane1.setTabComponentAt(tabbedPane1.getTabCount()-1, panelGroup);
+
+                panelGroup.setContainer(null);
+                if (selected >= 0)
+                    panelGroup.setSelectedIndex(selected);
+
+                tabbedPane1.insertTab(panelGroup.getName(), null, panelGroup.getPanels()[Math.max(panelGroup.getSelectedIndex(), 0)], null, index);
+                tabbedPane1.setTabComponentAt(index, panelGroup);
                 panelGroup.setContainer(tabbedPane1);
                 panelGroup.containerSelectedTabChanged();
             }
             else
             {
-                Container contentPane = getContentPane();
-                remove(contentPane);
-                tabbedPane1.addTab(contentPane.getName(), contentPane);
+                tabbedPane1.insertTab(poppedPanel.getName(), null, poppedPanel, null, index);
             }
+
+            tabbedPane1.setSelectedIndex(index);
 
             // keep the menu item and the map in sync with the panel actually being back in the tabbed pane
             poppedPanelMap.remove(poppedPanel);

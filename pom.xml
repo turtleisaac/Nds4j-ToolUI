@@ -15,7 +15,6 @@
     </properties>
 
     <dependencies>
-        <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf -->
         <!-- Declared because this module imports it. It used to arrive through
              jackson-dataformat-xml, which nothing here used - so removing that dead entry took
              Jackson with it and the build stopped compiling. Declare what is used; do not declare
@@ -32,6 +31,7 @@
             <version>2.15.2</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf -->
         <dependency>
             <groupId>com.formdev</groupId>
             <artifactId>flatlaf</artifactId>

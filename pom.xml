@@ -19,6 +19,16 @@
              jackson-dataformat-xml, which nothing here used - so removing that dead entry took
              Jackson with it and the build stopped compiling. Declare what is used; do not declare
              what is not. -->
+        <!-- The binding for the slf4j-api that JGit brings. Without one, slf4j defaults to a
+             no-op and every diagnostic JGit produces is discarded - which is the subsystem whose
+             failures have been hardest to see. jdk14 routes them into java.util.logging, and
+             ToolLog puts that into the log file. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>1.7.36</version>
+        </dependency>
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

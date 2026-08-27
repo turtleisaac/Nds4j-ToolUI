@@ -21,7 +21,6 @@ import net.miginfocom.swing.*;
 import org.eclipse.jgit.api.AddCommand;
 import org.eclipse.jgit.api.CommitCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
 
 /**
  * @author turtleisaac
@@ -95,19 +94,36 @@ public class ProjectCreateDialog extends JDialog {
 
     private void setResultText()
     {
-        Path path = Path.of(parentFolderField.getText(), projectNameField.getText());
-        String resultText = resultPrefix + " " + path.toString();
-
-        if (!projectNameField.getText().isEmpty()) {
-            if (!path.toFile().exists()) {
-                resultLabel.setForeground(Color.GREEN);
-                resultLabel.setIcon(ThemeUtils.validIcon);
-            } else {
-                resultLabel.setForeground(Color.RED);
-                resultLabel.setIcon(ThemeUtils.invalidIcon);
-            }
+        if (projectNameField.getText().isEmpty()) {
+            // Path.of(parent, "") collapses to the parent directory, so leaving the previous verdict up would
+            // claim the parent folder itself is a valid new project.
+            resultLabel.setIcon(null);
+            resultLabel.setForeground(UIManager.getColor("Label.foreground"));
+            resultLabel.setText(resultPrefix);
+            return;
         }
-        resultLabel.setText(resultText);
+
+        Path path = Path.of(parentFolderField.getText(), projectNameField.getText());
+
+        if (!path.toFile().exists()) {
+            resultLabel.setForeground(themeColor("Actions.Green"));
+            resultLabel.setIcon(ThemeUtils.validIcon);
+        } else {
+            resultLabel.setForeground(themeColor("Actions.Red"));
+            resultLabel.setIcon(ThemeUtils.invalidIcon);
+        }
+
+        resultLabel.setText(resultPrefix + " " + path);
+    }
+
+    /**
+     * Gets a color from the active look and feel, so the result line stays legible under every theme.
+     * <p>Color.GREEN on a light panel and Color.RED on a dark one are both close to unreadable.</p>
+     */
+    private static Color themeColor(String key)
+    {
+        Color color = UIManager.getColor(key);
+        return color != null ? color : UIManager.getColor("Label.foreground");
     }
 
     private void attemptEnableOkButton()
@@ -249,21 +265,33 @@ public class ProjectCreateDialog extends JDialog {
     private Thread getGitThread(File projectDir)
     {
         Thread gitThread = new Thread(() -> {
+            // Take the same lock Tool.commit() uses, so a save or a window close during the initial commit waits
+            // for it instead of racing it - the shutdown wait probes gitLock and would otherwise see it free.
+            tool.getGitLock().lock();
             // the handle is handed off to the Tool for later commits, so it must not be closed here
             try {
                 Git git = Git.init().setDirectory(new File(projectDir.getAbsolutePath())).call();
                 tool.setGit(git);
                 AddCommand add = git.add();
                 add.addFilepattern(".").call();
-                CommitCommand commit = git.commit();
+                // never signed, for the same reason Tool.commit() does not sign - see the note there
+                CommitCommand commit = git.commit().setSign(Boolean.FALSE);
                 commit.setMessage("Initial commit").call();
             }
-            catch (GitAPIException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), "Git Commit Error", JOptionPane.ERROR_MESSAGE);
-                throw new RuntimeException(ex);
+            catch (Throwable ex) {
+                // JGit raises unchecked JGitInternalException and IllegalArgumentException for ordinary
+                // configuration problems (hooks, signing), which would otherwise die silently on this thread.
+                String message = ex.getMessage();
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null,
+                        "The project was created, but setting up its git repository failed:\n" + message,
+                        "Git Init Failed", JOptionPane.ERROR_MESSAGE));
+                tool.setGitEnabledInternal(false);
             }
-            tool.setGitThread(null);
-        });
+            finally {
+                tool.getGitLock().unlock();
+                tool.setGitThread(null);
+            }
+        }, "Nds4j-ToolUI git init");
         gitThread.start();
         return gitThread;
     }

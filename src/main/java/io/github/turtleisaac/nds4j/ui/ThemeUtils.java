@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * Provides functionality relating to theme switching for a <code>Tool</code>
@@ -34,7 +35,7 @@ public class ThemeUtils
     /**
      * A filter to be used for adjusting the color of a SVG file displayed as an icon.
      */
-    public static final FlatSVGIcon.ColorFilter iconColorFilter = FlatSVGIcon.ColorFilter.getInstance();
+    public static final FlatSVGIcon.ColorFilter iconColorFilter = new FlatSVGIcon.ColorFilter();
 
     /**
      * A symbol representing a right arrow
@@ -173,8 +174,7 @@ public class ThemeUtils
             FlatLaf.updateUI();
             FlatAnimatedLafChange.hideSnapshotWithAnimation();
 
-            iconColorFilter.removeAll();
-            iconColorFilter.add(Color.black, UIManager.getColor("Button.focusedBorderColor"));
+            applyIconColors();
 
 //            if (Tool.instance.projectStartFrame != null) {
 //                SwingUtilities.updateComponentTreeUI(Tool.instance.projectStartFrame);
@@ -187,6 +187,22 @@ public class ThemeUtils
         catch(UnsupportedLookAndFeelException | NullPointerException e) {
             throw new ToolAttributeModificationException("An error occurred while setting the look and feel of the tool", e);
         }
+    }
+
+    /**
+     * Repoints the icon color filter at the colors of the look and feel which is currently installed.
+     * <p>The bundled SVG icons are stroke-only, so without this they paint pure black whatever the theme.</p>
+     */
+    protected static void applyIconColors()
+    {
+        Color replacement = UIManager.getColor("Button.focusedBorderColor");
+        if (replacement == null)
+            replacement = UIManager.getColor("Label.foreground");
+        if (replacement == null)
+            return;
+
+        iconColorFilter.removeAll();
+        iconColorFilter.add(Color.black, replacement);
     }
 
     /**
@@ -247,6 +263,8 @@ public class ThemeUtils
         @Override
         public LookAndFeel next()
         {
+            if (themes.isEmpty())
+                throw new NoSuchElementException("No look and feels have been registered - use Tool.addLookAndFeel()");
             if (!hasNext())
                 idx = 0;
             return themes.get(idx++);

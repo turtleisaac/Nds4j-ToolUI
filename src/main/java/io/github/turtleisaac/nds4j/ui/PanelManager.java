@@ -14,6 +14,7 @@ public abstract class PanelManager
 {
     private final Tool tool;
     private final String name;
+    private List<JPanel> cachedPanels;
 
     /**
      * Creates a new <code>PanelManager</code> which has access to the information contained
@@ -33,6 +34,20 @@ public abstract class PanelManager
      * @return a <code>List</code><<code>JPanel</code>> containing the panels controlled by this <code>PanelManager</code>
      */
     public abstract List<JPanel> getPanels();
+
+    /**
+     * Gets the panels controlled by this <code>PanelManager</code>, calling <code>getPanels()</code> only once.
+     * <p>Implementations are free to build their panels inside <code>getPanels()</code>, so it must not be
+     * called repeatedly - the <code>ToolFrame</code> keeps the instances it was handed the first time, and a
+     * fresh set would no longer be the panels that are actually mounted.</p>
+     * @return a <code>List</code><<code>JPanel</code>> containing the panels controlled by this <code>PanelManager</code>
+     */
+    public final List<JPanel> panels()
+    {
+        if (cachedPanels == null)
+            cachedPanels = getPanels();
+        return cachedPanels;
+    }
 
     /**
      * Gets whether the panels controlled by this <code>PanelManager</code> have unsaved changes
@@ -57,7 +72,7 @@ public abstract class PanelManager
 
     public void doToolFrameSelectedTabChangedAction(ChangeEvent e)
     {
-        for (JPanel panel : getPanels())
+        for (JPanel panel : panels())
         {
             if (panel instanceof PanelGroup group)
             {
@@ -249,9 +264,19 @@ public abstract class PanelManager
             return panelSelector.getSelectedIndex();
         }
 
+        /**
+         * Sets which of this group's panels is the selected one, without touching the container.
+         * @param index the index of the panel to select
+         */
+        protected void setSelectedIndex(int index)
+        {
+            if (index >= 0 && index < panels.length)
+                panelSelector.setSelectedIndex(index);
+        }
+
         protected void performPanelChange(ActionEvent e)
         {
-            if (panels.length > 1)
+            if (container != null && panels.length > 1)
             {
                 int selected = container.getSelectedIndex();
                 container.removeTabAt(selected);

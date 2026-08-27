@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -63,7 +65,7 @@ public class Tool {
 
     private final List<String> gameCodes;
     private final List<String> gameTitles;
-    private final Map<Predicate<NintendoDsRom>, String> validationChecks;
+    private final List<Map.Entry<Predicate<NintendoDsRom>, String>> validationChecks;
 
     private Image icon;
 
@@ -76,7 +78,7 @@ public class Tool {
 
     private volatile Git git;
     private volatile Thread gitThread;
-    private volatile boolean commitPending;
+    private final AtomicBoolean commitPending = new AtomicBoolean(false);
     /**
      * How long a save waits for a backup commit to finish staging before telling the user it
      * cannot save yet.
@@ -104,7 +106,7 @@ public class Tool {
         alternateStartPanels = new ArrayList<>();
         gameCodes = new ArrayList<>();
         gameTitles = new ArrayList<>();
-        validationChecks = new HashMap<>();
+        validationChecks = new ArrayList<>();
         panelManagerSuppliers = new ArrayList<>();
         functions = new ArrayList<>();
         locales = new ArrayList<>();
@@ -376,9 +378,11 @@ public class Tool {
     public Tool addValidationCheck(Predicate<NintendoDsRom> predicate, String errorMessage)
     {
         testStarted();
+        if (predicate == null)
+            throw new ToolAttributeModificationException("A validation check requires a predicate to test the ROM with");
         if (errorMessage == null || errorMessage.isEmpty())
             throw new ToolAttributeModificationException("You need to provide an actual error message to be displayed to the user if their provided ROM fails the check");
-        validationChecks.put(predicate, errorMessage);
+        validationChecks.add(Map.entry(predicate, errorMessage));
         return this;
     }
 
@@ -419,6 +423,44 @@ public class Tool {
      */
     public void init() throws ToolCreationException
     {
+        // Swing components may only be created and touched on the event dispatch thread. Marshal the startup
+        // sequence there, while keeping init()'s blocking contract for the thread that called it.
+        if (!SwingUtilities.isEventDispatchThread())
+        {
+            final ToolCreationException[] failure = new ToolCreationException[1];
+            try {
+                SwingUtilities.invokeAndWait(() -> {
+                    try {
+                        doInit();
+                    }
+                    catch (ToolCreationException e) {
+                        failure[0] = e;
+                    }
+                });
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ToolCreationException("Interrupted while starting the tool");
+            }
+            catch (InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof RuntimeException runtimeException)
+                    throw runtimeException;
+                if (cause instanceof Error error)
+                    throw error;
+                throw new ToolCreationException("An error occurred while starting the tool: " + cause);
+            }
+
+            if (failure[0] != null)
+                throw failure[0];
+            return;
+        }
+
+        doInit();
+    }
+
+    private void doInit() throws ToolCreationException
+    {
         started = true;
         if (functions.isEmpty() && panelManagerSuppliers.isEmpty())
             throw new ToolCreationException("No panel managers or functions were provided");
@@ -431,6 +473,8 @@ public class Tool {
             // function-based tools operate directly on a packed ROM, so default them accordingly
             type = ProgramType.ROM;
         }
+        if (!functions.isEmpty() && type != ProgramType.ROM)
+            throw new ToolCreationException("Functions are only supported by ProgramType.ROM tools - use a PanelManager for project-based tools");
         if (functions.isEmpty() && (name == null || name.isEmpty()))
             throw new ToolCreationException("Program name not specified");
         if (functions.isEmpty() && (version == null || version.isEmpty()))
@@ -638,6 +682,9 @@ public class Tool {
             catch(UnsupportedLookAndFeelException | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
                 throw new ToolAttributeModificationException("An error occurred while creating the look and feel of the tool", e);
             }
+            // ThemeUtils.changeTheme() is what normally points the icon filter at the theme's colors, and this
+            // branch skips it - without this the stroke-only SVG icons paint black on a dark UI.
+            ThemeUtils.applyIconColors();
         }
         else {
             if (preferences.get("laf", null) != null) {
@@ -705,7 +752,7 @@ public class Tool {
      */
     public List<String> getGameCodes()
     {
-        return gameCodes;
+        return Collections.unmodifiableList(gameCodes);
     }
 
     protected JFrame getProjectStartFrame()
@@ -760,7 +807,7 @@ public class Tool {
         if (!supported)
             return new RomSupportContext(false, createGameCodeNotSupportedMessage(rom));
 
-        for (Map.Entry<Predicate<NintendoDsRom>, String> check : validationChecks.entrySet()) {
+        for (Map.Entry<Predicate<NintendoDsRom>, String> check : validationChecks) {
             if (!check.getKey().test(rom))
             {
                 return new RomSupportContext(false, check.getValue());
@@ -1092,12 +1139,26 @@ public class Tool {
     }
 
     /**
+     * Reports a failure from a background thread.
+     * <p>A modal dialog blocks whichever thread shows it, and these are raised while the git worker still holds
+     * gitLock - showing one inline would hold the lock for as long as the dialog is up, so every save in the
+     * meantime would be refused and the window could not be closed. Hand it to the event dispatch thread
+     * instead.</p>
+     */
+    private void showFromWorker(String message, String title)
+    {
+        if (toolFrame == null)
+            return;
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(toolFrame, message, title, JOptionPane.ERROR_MESSAGE));
+    }
+
+    /**
      * Gets whether a commit has been scheduled and has not yet finished
      * @return a <code>boolean</code>
      */
     public boolean isCommitPending()
     {
-        return commitPending;
+        return commitPending.get();
     }
 
     public boolean commit(String commitMessage)
@@ -1107,20 +1168,18 @@ public class Tool {
         if (!gitEnabled)
             return true;
 
-        if (!gitLock.tryLock())
+        // Claim the slot before the worker exists. Probing gitLock and releasing it again leaves a window
+        // between the probe and the worker actually taking the lock, in which a second commit passes the same
+        // probe - back-to-back saves then queue extra workers and extra commits.
+        if (!commitPending.compareAndSet(false, true))
         {
             JOptionPane.showMessageDialog(toolFrame, "Your changes have been saved to disk, but no backup commit was created because a previous commit is still occurring in the background. Try committing again in a few seconds.", "Commit Skipped", JOptionPane.WARNING_MESSAGE);
             return false;
         }
 
-        // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
-        gitLock.unlock();
-
-        commitPending = true;
         gitThread = new Thread(() -> {
             gitLock.lock();
             try {
-                Thread.sleep(10000);
                 // The working tree must not be written to while it is being staged. Not because a
                 // half-written file could be committed - FileUtils writes through a temporary and
                 // renames, so no file is ever visible in a partial state - but because a save
@@ -1162,22 +1221,16 @@ public class Tool {
                 gitEnabled = false;
             }
             catch (IOException e) {
-                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                showFromWorker(e.getMessage(), "ROM Write Failed");
                 throw new RuntimeException(e);
             }
             catch (GitAPIException e) {
-                if (toolFrame != null) {
-                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-                }
-                throw new RuntimeException(e);
-            }
-            catch(InterruptedException e) {
-                Thread.currentThread().interrupt();
+                showFromWorker(e.getMessage(), "Git Commit Failed");
                 throw new RuntimeException(e);
             }
             finally {
-                commitPending = false;
                 gitLock.unlock();
+                commitPending.set(false);
             }
         });
 

@@ -1,5 +1,6 @@
 package io.github.turtleisaac.nds4j.ui;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.formdev.flatlaf.util.SystemInfo;
 
@@ -14,13 +15,14 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 
-import io.github.turtleisaac.nds4j.framework.BinaryWriter;
+import io.github.turtleisaac.nds4j.framework.StringFormatter;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolAttributeModificationException;
 import io.github.turtleisaac.nds4j.ui.exceptions.ToolCreationException;
 import io.github.turtleisaac.nds4j.NintendoDsRom;
@@ -39,6 +41,11 @@ public class Tool {
      */
     public static Preferences preferences = Preferences.userNodeForPackage(Tool.class);
 
+    /**
+     * The key under which the user's selected locale is stored in <code>preferences</code>
+     */
+    private static final String LOCALE_PREFERENCE_KEY = "locale";
+
     private boolean started;
     private boolean windowMode;
 
@@ -52,7 +59,7 @@ public class Tool {
     private ArrayList<JPanel> alternateStartPanels;
     private Locale defaultLocale;
     private List<Locale> locales;
-    private boolean gitEnabled;
+    private volatile boolean gitEnabled;
 
     private final List<String> gameCodes;
     private final List<String> gameTitles;
@@ -67,8 +74,26 @@ public class Tool {
     private JFrame projectStartFrame;
     private ToolFrame toolFrame;
 
-    private Git git;
-    private Thread gitThread;
+    private volatile Git git;
+    private volatile Thread gitThread;
+    private volatile boolean commitPending;
+    /**
+     * How long a save waits for a backup commit to finish staging before telling the user it
+     * cannot save yet.
+     * <p>
+     * Chosen from measurement rather than taste. Staging with JGit costs roughly what it has to
+     * hash: once a project is tracked, only changed files are read, and staging a two-file change
+     * took under a second whether the project held 12,000 files or 50,000. Five seconds is several
+     * times the window this actually contends with.
+     * <p>
+     * The exception is the very first commit of a new project, where every file is hashed - 0.8s
+     * for 12,000 files, 11s for 50,000. That can exceed this, and deliberately so: waiting is a
+     * frozen window with nothing on screen, so bounding it at five seconds and explaining is
+     * better than a fifteen-second freeze. A retry immediately afterwards is fast, because the
+     * work that took the time is not repeated.
+     */
+    private static final long SAVE_LOCK_TIMEOUT_SECONDS = 5;
+
     private Lock saveLock = new ReentrantLock();
     private Lock gitLock = new ReentrantLock();
 
@@ -220,6 +245,65 @@ public class Tool {
     }
 
     /**
+     * Gets the locales the user can select between, which is every locale added to this <code>Tool</code>
+     * plus the locale which was active when the first one was added
+     * @return a <code>List</code><<code>Locale</code>>
+     */
+    protected List<Locale> getSelectableLocales()
+    {
+        List<Locale> selectable = new ArrayList<>();
+        if (defaultLocale != null && !locales.contains(defaultLocale))
+            selectable.add(defaultLocale);
+        selectable.addAll(locales);
+        return selectable;
+    }
+
+    /**
+     * Changes the default locale to the next one available to this <code>Tool</code>, then stores the
+     * selection in the user's preferences
+     * @return the newly selected <code>Locale</code>
+     */
+    protected Locale changeLocale()
+    {
+        List<Locale> selectable = getSelectableLocales();
+        if (selectable.isEmpty())
+            return Locale.getDefault();
+
+        int idx = selectable.indexOf(Locale.getDefault());
+        return setLocale(selectable.get((idx + 1) % selectable.size()));
+    }
+
+    /**
+     * Changes the default locale to the provided one, then stores the selection in the user's preferences
+     * @param locale the <code>Locale</code> to change to
+     * @return the provided <code>Locale</code>
+     */
+    protected Locale setLocale(Locale locale)
+    {
+        Locale.setDefault(locale);
+        ResourceBundle.clearCache();
+        preferences.put(LOCALE_PREFERENCE_KEY, locale.toLanguageTag());
+        return locale;
+    }
+
+    /**
+     * Changes the current locale to the saved user preference, if it is one of this <code>Tool</code>'s locales
+     */
+    private void applyPreferredLocale()
+    {
+        String tag = preferences.get(LOCALE_PREFERENCE_KEY, null);
+        if (tag == null)
+            return;
+
+        Locale stored = Locale.forLanguageTag(tag);
+        if (getSelectableLocales().contains(stored))
+        {
+            Locale.setDefault(stored);
+            ResourceBundle.clearCache();
+        }
+    }
+
+    /**
      * Enables Git support for project-based tools.
      * <p></p>
      * @param enabled a <code>boolean</code> representing whether Git mode should be enabled.
@@ -340,8 +424,13 @@ public class Tool {
             throw new ToolCreationException("No panel managers or functions were provided");
         if (!functions.isEmpty() && ! panelManagerSuppliers.isEmpty())
             throw new ToolCreationException("Both panel managers and functions were provided - please only use one type of tool functionality");
-        if (functions.isEmpty() && type == null)
-            throw new ToolCreationException("Program type not specified");
+        if (type == null)
+        {
+            if (functions.isEmpty())
+                throw new ToolCreationException("Program type not specified");
+            // function-based tools operate directly on a packed ROM, so default them accordingly
+            type = ProgramType.ROM;
+        }
         if (functions.isEmpty() && (name == null || name.isEmpty()))
             throw new ToolCreationException("Program name not specified");
         if (functions.isEmpty() && (version == null || version.isEmpty()))
@@ -363,6 +452,7 @@ public class Tool {
         }
 
         testGitAllowed();
+        applyPreferredLocale();
 
         setLookAndFeel();
         switch (type) {
@@ -403,6 +493,14 @@ public class Tool {
         else {
             runProvidedFunctions();
             String outputPath = selectRomToExport();
+
+            // null means the user cancelled the file chooser or declined to overwrite. The whole
+            // pipeline has already run by this point, so throwing a NullPointerException at them
+            // discards all of it - and the overwrite prompt makes that a button they are now
+            // routinely offered.
+            if (outputPath == null)
+                return;
+
             try {
                 rom.saveToFile(outputPath, true);
             }
@@ -463,6 +561,7 @@ public class Tool {
     }
 
     private String path;
+    private String projectPath;
 
     /**
      * Starts the window of this <code>Tool</code>
@@ -472,6 +571,8 @@ public class Tool {
     protected void startToolWindow(String path)
     {
         this.path = path;
+        // `path` is the path to the .nds file for ROM-based tools, so only project-based tools have a project directory
+        this.projectPath = (type == ProgramType.PROJECT) ? path : null;
         toolFrame = new ToolFrame(this);
         //todo uncomment
         toolFrame.setTitle(name + " " + version + " " + new File(path).getName());
@@ -513,10 +614,11 @@ public class Tool {
 
     private void handleToolbarIfSupported()
     {
-        final Taskbar taskbar = Taskbar.getTaskbar();
-        if (icon != null && taskbar != null) {
+        if (icon != null && Taskbar.isTaskbarSupported()) {
             try {
                 //set icon for macOS (and other systems which do support this method)
+                // (HeadlessException and UnsupportedOperationException can both be thrown by getTaskbar())
+                final Taskbar taskbar = Taskbar.getTaskbar();
                 taskbar.setIconImage(icon);
             } catch (final UnsupportedOperationException e) {
                 System.out.println("[WARNING]: The OS does not support: 'taskbar.setIconImage'. This should not affect program usage in any way and can be ignored.");
@@ -688,79 +790,398 @@ public class Tool {
         return sb.toString();
     }
 
-    public boolean writeModifiedFile(String pathWithinRom)
+    /**
+     * Gets the path to the directory of the currently open project
+     * @return a <code>String</code> containing the absolute path of the open project directory
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or no project is open
+     */
+    protected String requireProjectPath()
     {
-        saveLock.lock();
+        if (type != ProgramType.PROJECT)
+            throw new UnsupportedOperationException("Writing to an unpacked ROM is only supported by project-based tools");
+        if (projectPath == null)
+            throw new UnsupportedOperationException("No project is currently open");
+        return projectPath;
+    }
+
+    private Path unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES section)
+    {
+        return Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()), section.getName());
+    }
+
+    /**
+     * Resolves the file an overlay is unpacked to, and the ID of that overlay's file in the ROM.
+     */
+    private Path overlaySectionPath(int overlayId)
+    {
+        byte[] y9 = rom.getY9();
+        int overlayCount = y9.length / 32;
+
+        if (overlayId < 0 || overlayId >= overlayCount)
+            throw new IndexOutOfBoundsException("Overlay " + overlayId + " does not exist in the loaded ROM");
+
+        return Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+                NintendoDsRom.UNPACKED_FILENAMES.OVERLAY.getName(),
+                StringFormatter.formatOutputString(overlayId, overlayCount, "overlay_", ".bin"));
+    }
+
+    private int overlayFileId(int overlayId)
+    {
+        byte[] y9 = rom.getY9();
+        // the file ID of an overlay is stored at offset 0x18 of its 32-byte entry in the overlay table
+        int offset = overlayId * 32 + 0x18;
+        return (y9[offset] & 0xFF) | ((y9[offset + 1] & 0xFF) << 8)
+                | ((y9[offset + 2] & 0xFF) << 16) | ((y9[offset + 3] & 0xFF) << 24);
+    }
+
+    /**
+     * Takes the save lock, waiting only so long for it.
+     * <p>
+     * A backup commit holds this lock while it stages the working tree, which for a project of
+     * tens of thousands of files takes a while. Blocking on it outright froze the interface with
+     * nothing said - the user clicked save and the application stopped responding. Waiting a
+     * bounded time and then saying what is happening is worse than never blocking and better than
+     * blocking forever, which is the honest position until saving moves off the event thread.
+     *
+     * @throws IllegalStateException if the lock could not be taken in time; nothing has been written
+     */
+    private void lockForSave()
+    {
+        try {
+            if (saveLock.tryLock(SAVE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                return;
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting to save", e);
+        }
+
+        JOptionPane.showMessageDialog(toolFrame,
+                "Nothing has been saved yet: a backup commit is still reading through the project's"
+                        + " files, and saving during that would put a half-written project into the"
+                        + " commit. Save again in a moment - it will not have to wait a second time."
+                        + "\n\nThis is most likely the first backup after creating a project, which"
+                        + " has every file to read rather than only the changed ones.",
+                "Save Postponed", JOptionPane.WARNING_MESSAGE);
+        throw new IllegalStateException("The save lock is held by a commit in progress");
+    }
+
+    /**
+     * Writes several unpacked sections as one batch, so that a failure part way through leaves the
+     * project as it was rather than half saved.
+     * @return a builder; nothing is written until {@link SaveBatch#write()} is called
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     */
+    public SaveBatch saveBatch()
+    {
+        requireProjectPath();
+        return new SaveBatch();
+    }
+
+    /**
+     * A set of unpacked sections to be written together.
+     * <p>
+     * A ROM project is not one file, and a save that stops half way is a state the ROM was never
+     * in - a new <code>personal.narc</code> beside an old TM table in <code>arm9.bin</code>.
+     * Collecting the writes first lets all of them be staged before any is moved into place, so
+     * the failures that actually happen - a full disk, a read-only file, a bad path - are found
+     * while everything on disk is still the old version.
+     */
+    public final class SaveBatch
+    {
+        private final Map<Path, byte[]> writes = new LinkedHashMap<>();
+
+        private SaveBatch() {}
+
+        /** @param pathWithinRom the path of the file within the ROM's filesystem */
+        public SaveBatch file(String pathWithinRom)
+        {
+            writes.put(Paths.get(FileUtils.getProjectUnpackedRomPath(requireProjectPath()),
+                    NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom),
+                    rom.getFileByName(pathWithinRom));
+            return this;
+        }
+
+        public SaveBatch arm9()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM9), rom.getArm9());
+            return this;
+        }
+
+        public SaveBatch arm7()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.ARM7), rom.getArm7());
+            return this;
+        }
+
+        public SaveBatch y9()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y9), rom.getY9());
+            return this;
+        }
+
+        public SaveBatch y7()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.Y7), rom.getY7());
+            return this;
+        }
+
+        /**
+         * @param overlayId the ID of the overlay to write
+         * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
+         */
+        public SaveBatch overlay(int overlayId)
+        {
+            writes.put(overlaySectionPath(overlayId), rom.getFile(overlayFileId(overlayId)));
+            return this;
+        }
+
+        public SaveBatch banner()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.BANNER), rom.getIconBanner());
+            return this;
+        }
+
+        public SaveBatch header()
+        {
+            writes.put(unpackedSectionPath(NintendoDsRom.UNPACKED_FILENAMES.HEADER), rom.getHeader());
+            return this;
+        }
+
+        /**
+         * Writes every section collected so far. Either all of them are replaced, or - for any
+         * failure that happens while writing - none of them are.
+         * @throws RuntimeException if the batch could not be written; the message has been shown
+         *         to the user already
+         */
+        public void write()
+        {
+            lockForSave();
+
+            try {
+                FileUtils.atomicWriteAll(writes);
+            }
+            catch (IOException e) {
+                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                throw new RuntimeException(e);
+            }
+            finally {
+                saveLock.unlock();
+            }
+        }
+    }
+
+
+    /**
+     * This is to be used for a project-based tool saving a modified file within the ROM's filesystem back to disk.
+     * @param pathWithinRom a <code>String</code> containing the path of the file within the ROM's filesystem
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the file could not be written
+     */
+    public void writeModifiedFile(String pathWithinRom)
+    {
+        saveBatch().file(pathWithinRom).write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 binary back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedArm9()
+    {
+        saveBatch().arm9().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 binary back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedArm7()
+    {
+        saveBatch().arm7().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm9 overlay table back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedY9()
+    {
+        saveBatch().y9().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified arm7 overlay table back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws RuntimeException if the section could not be written
+     */
+    public void writeModifiedY7()
+    {
+        saveBatch().y7().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving a modified arm9 overlay back to disk.
+     * @param overlayId the ID of the overlay to write
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based
+     * @throws IndexOutOfBoundsException if the provided overlay ID does not exist in the loaded ROM
+     * @throws RuntimeException if the overlay could not be written
+     */
+    public void writeModifiedOverlay(int overlayId)
+    {
+        saveBatch().overlay(overlayId).write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified icon banner back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
+     *          version of Nds4j does not provide access to the icon banner of a ROM
+     * @throws RuntimeException if the banner could not be written
+     */
+    public void writeModifiedBanner()
+    {
+        saveBatch().banner().write();
+    }
+
+    /**
+     * This is to be used for a project-based tool saving the modified ROM header back to disk.
+     * @throws UnsupportedOperationException if this <code>Tool</code> is not project-based, or if the installed
+     *          version of Nds4j does not provide access to the serialized header of a ROM
+     * @throws RuntimeException if the header could not be written
+     */
+    public void writeHeader()
+    {
+        saveBatch().header().write();
+    }
+
+    /**
+     * Writes the contents of this <code>Tool</code>'s Projectfile back to disk. Does nothing for non-project-based tools.
+     * @return a <code>boolean</code> representing whether the action was a success
+     */
+    public boolean writeProjectInfo()
+    {
+        if (type != ProgramType.PROJECT || projectPath == null || info == null)
+            return false;
+
+        // Bounded like every other save, so a commit staging the working tree cannot freeze the
+        // interface here either. This one reports failure rather than throwing, because unlike
+        // the section writers it has always had a boolean that means something.
+        try {
+            lockForSave();
+        }
+        catch (IllegalStateException e) {
+            return false;
+        }
 
         try {
-            System.out.println(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile().getAbsolutePath());
-            BinaryWriter.writeFile(Paths.get(FileUtils.getProjectUnpackedRomPath(path), NintendoDsRom.UNPACKED_FILENAMES.DATA.getName(), pathWithinRom).toFile(), rom.getFileByName(pathWithinRom));
+            FileUtils.atomicWrite(Paths.get(FileUtils.getProjectfilePath(projectPath)),
+                    new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsBytes(info));
         }
         catch (IOException e) {
-            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(e);
+            JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Projectfile Write Failed", JOptionPane.ERROR_MESSAGE);
+            return false;
         }
         finally {
             saveLock.unlock();
-            System.out.println("Save unlocked");
         }
 
         return true;
     }
 
+    /**
+     * Gets whether a commit has been scheduled and has not yet finished
+     * @return a <code>boolean</code>
+     */
+    public boolean isCommitPending()
+    {
+        return commitPending;
+    }
+
     public boolean commit(String commitMessage)
     {
-        if (gitEnabled && !gitLock.tryLock())
+        writeProjectInfo();
+
+        if (!gitEnabled)
+            return true;
+
+        if (!gitLock.tryLock())
         {
-            JOptionPane.showMessageDialog(toolFrame, "Your changes have not been saved due to a previous commit still occurring in the background. Try saving again in a few seconds.", "Save Error", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(toolFrame, "Your changes have been saved to disk, but no backup commit was created because a previous commit is still occurring in the background. Try committing again in a few seconds.", "Commit Skipped", JOptionPane.WARNING_MESSAGE);
             return false;
         }
 
         // at this point, gitLock will be acquired, therefore we can unlock so the new thread can use it
         gitLock.unlock();
 
-        if (gitEnabled)
-        {
-            gitThread = new Thread(() -> {
-                gitLock.lock();
-                System.out.println("Git locked");
+        commitPending = true;
+        gitThread = new Thread(() -> {
+            gitLock.lock();
+            try {
+                Thread.sleep(10000);
+                // The working tree must not be written to while it is being staged. Not because a
+                // half-written file could be committed - FileUtils writes through a temporary and
+                // renames, so no file is ever visible in a partial state - but because a save
+                // landing mid-staging commits some files new and some old, which is a snapshot of
+                // the project that never existed.
+                //
+                // Held only across staging, which is the part that has to see one consistent tree.
+                // The commit itself writes objects git has already read, so a save during it is
+                // harmless, and releasing first is the difference between a save waiting on one
+                // directory walk and a save waiting on a whole commit. A save that does have to
+                // wait now waits a bounded time and says so, rather than freezing the interface -
+                // see lockForSave.
+                saveLock.lock();
                 try {
-                    Thread.sleep(10000);
                     if (git == null)
-                        git = Git.open(new File(path));
+                        git = Git.open(new File(requireProjectPath()));
                     git.add().addFilepattern(".").call();
-                    CommitCommand commit = git.commit();
-                    String message = commitMessage;
-                    if (message == null)
-                        message = String.format("%s %s changes", name, version);
-                    else
-                        message = String.format("(%s %s) %s", name, version, message);
-                    commit.setMessage(message).call();
-                }
-                catch (RepositoryNotFoundException e) {
-                    gitEnabled = false;
-                }
-                catch (IOException e) {
-                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
-                    throw new RuntimeException(e);
-                }
-                catch (GitAPIException e) {
-                    if (toolFrame != null) {
-                        JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-                    }
-                    throw new RuntimeException(e);
-                }
-                catch(InterruptedException e) {
-                    throw new RuntimeException(e);
                 }
                 finally {
-                    gitLock.unlock();
-                    System.out.println("Git unlocked");
+                    saveLock.unlock();
                 }
-            });
 
-            gitThread.start();
-        }
+                // Never signed. These are automatic local backups, so a signature asserts
+                // nothing about who made the change, and inheriting the user's global signing
+                // config makes their setup decide whether the backup happens at all: with
+                // gpg.format=ssh - which is ordinary now, GitHub supports it - JGit refuses to
+                // commit, and did so with an unchecked exception that escaped the handlers below
+                // and surfaced as "an unexpected error occurred" after every save. The save had
+                // worked; only the backup was lost, and nothing said so.
+                CommitCommand commit = git.commit().setSign(Boolean.FALSE);
+                String message = commitMessage;
+                if (message == null)
+                    message = String.format("%s %s changes", name, version);
+                else
+                    message = String.format("(%s %s) %s", name, version, message);
+                commit.setMessage(message).call();
+            }
+            catch (RepositoryNotFoundException e) {
+                gitEnabled = false;
+            }
+            catch (IOException e) {
+                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                throw new RuntimeException(e);
+            }
+            catch (GitAPIException e) {
+                if (toolFrame != null) {
+                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
+                }
+                throw new RuntimeException(e);
+            }
+            catch(InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+            finally {
+                commitPending = false;
+                gitLock.unlock();
+            }
+        });
+
+        gitThread.start();
 
         return true;
     }
@@ -890,6 +1311,9 @@ public class Tool {
         if (!foundExtension)
             outputPath += FileUtils.ndsExtensions[0];
 
+        if (!FileUtils.confirmOverwrite(null, new File(outputPath)))
+            return null;
+
         return outputPath;
     }
 
@@ -915,7 +1339,9 @@ public class Tool {
 
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            preferences.put(lastPathKey, selected.getParentFile().getAbsolutePath());
+            File parent = selected.getParentFile();
+            if (parent != null)
+                preferences.put(lastPathKey, parent.getAbsolutePath());
             return selected.getAbsolutePath();
         }
 
@@ -941,7 +1367,14 @@ public class Tool {
         if (projectPath == null)
             return null;
 
-        rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        try {
+            rom = NintendoDsRom.fromUnpacked(FileUtils.getProjectUnpackedRomPath(projectPath));
+        }
+        catch (RuntimeException e) {
+            JOptionPane.showMessageDialog(parentComponent, "The unpacked ROM in this project could not be read:\n" + e.getMessage(), "Invalid Project", JOptionPane.ERROR_MESSAGE);
+            rom = null;
+            return null;
+        }
         return performValidation(parentComponent, projectPath);
     }
 
@@ -982,10 +1415,12 @@ public class Tool {
 
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File selected = fc.getSelectedFile();
-            if (selected.isFile()) {
+            if (selected.isFile() && selected.getParentFile() != null) {
                 selected = selected.getParentFile();
             }
-            preferences.put("openProjectPath", selected.getParentFile().getAbsolutePath());
+            File parent = selected.getParentFile();
+            if (parent != null)
+                preferences.put("openProjectPath", parent.getAbsolutePath());
             return selected.getAbsolutePath();
         }
 

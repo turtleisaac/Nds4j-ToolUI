@@ -6,7 +6,7 @@
 
     <groupId>io.github.turtleisaac</groupId>
     <artifactId>Nds4j-ToolUI</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 
     <properties>
         <maven.compiler.source>20</maven.compiler.source>
@@ -16,16 +16,25 @@
 
     <dependencies>
         <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf -->
+        <!-- Declared because this module imports it. It used to arrive through
+             jackson-dataformat-xml, which nothing here used - so removing that dead entry took
+             Jackson with it and the build stopped compiling. Declare what is used; do not declare
+             what is not. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.15.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.15.2</version>
+        </dependency>
+
         <dependency>
             <groupId>com.formdev</groupId>
             <artifactId>flatlaf</artifactId>
-            <version>3.2.1</version>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf-intellij-themes -->
-        <dependency>
-            <groupId>com.formdev</groupId>
-            <artifactId>flatlaf-intellij-themes</artifactId>
             <version>3.2.1</version>
         </dependency>
 
@@ -33,12 +42,6 @@
             <groupId>com.formdev</groupId>
             <artifactId>flatlaf-extras</artifactId>
             <version>3.2.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.weisj</groupId>
-            <artifactId>jsvg</artifactId>
-            <version>1.2.0</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/com.miglayout/miglayout -->
@@ -52,21 +55,28 @@
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>6.7.0.202309050840-r</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-xml</artifactId>
-            <version>2.15.2</version>
+            <version>7.1.0.202411261347-r</version>
         </dependency>
 
         <dependency>
             <groupId>io.github.turtleisaac</groupId>
             <artifactId>Nds4j</artifactId>
-            <version>0.1.0</version>
+            <version>1.0.0</version>
         </dependency>
 
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.24.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

@@ -15,6 +15,8 @@ See [Nds4j](https://github.com/turtleisaac/Nds4j), my library which this was des
 
 **Note:** The intended use is for you to create your own class (or multiple) which extends the abstract class `PanelManager` and implements all of the functionality needed for creating your tool panels and managing the sharing of data between them. What I have below is just a demonstration of a valid input.
 ```java
+    public static void main(String[] args) throws IOException
+    {
         Tool tool = Tool.create();
         tool.setType(ProgramType.PROJECT)
                 .setName("Test Tool")
@@ -52,24 +54,13 @@ See [Nds4j](https://github.com/turtleisaac/Nds4j), my library which this was des
                     }
 
                     @Override
-                    public void doForwardsButtonAction(ActionEvent e)
-                    {
-
-                    }
-
-                    @Override
-                    public void doBackButtonAction(ActionEvent e)
-                    {
-
-                    }
-
-                    @Override
                     public void doInfoButtonAction(ActionEvent e)
                     {
 
                     }
                 })
                 .init();
+    }
 ```
 
 The above code can produce the below results:
@@ -87,6 +78,8 @@ The above code can produce the below results:
 ## Example for ROM Function Mode
 
 ```java
+    public static void main(String[] args) throws IOException
+    {
         Tool tool = Tool.create();
         tool.setType(ProgramType.ROM)
                 .addGame("Pokémon HeartGold","IPK")
@@ -98,9 +91,9 @@ The above code can produce the below results:
                     {
                         personal.setFile(i, personal.getFile(399));
                     }
-                    return null;
                 })
                 .init();
+    }
 ```
 
 The above code does the following:

@@ -8,6 +8,7 @@ import io.github.turtleisaac.nds4j.ui.exceptions.ToolAttributeModificationExcept
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -101,43 +102,56 @@ public class ThemeUtils
     public static final FlatSVGIcon fileExportIcon;
 
     static {
-        try {
-            rightIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/chevron-right.svg"));
-            leftIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/chevron-left.svg"));
-            folderSearchIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/folder-search.svg"));
-            fileSearchIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/file-search.svg"));
-            folderOpenIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/folder-open.svg"));
-            saveIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/device-floppy.svg"));
-            infoIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/info-square-rounded.svg"));
-            appWindowIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/app-window.svg"));
-            validIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/checks.svg"));
-            invalidIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/alert-circle.svg"));
-            gamepadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/device-gamepad.svg"));
-            zoomInIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-in.svg"));
-            zoomOutIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/zoom-out.svg"));
-            reloadIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/refresh.svg"));
-            fileImportIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/file-import.svg"));
-            fileExportIcon = new FlatSVGIcon(ToolFrame.class.getResourceAsStream("/icons/svg/file-export.svg"));
+        rightIcon = loadIcon("/icons/svg/chevron-right.svg");
+        leftIcon = loadIcon("/icons/svg/chevron-left.svg");
+        folderSearchIcon = loadIcon("/icons/svg/folder-search.svg");
+        fileSearchIcon = loadIcon("/icons/svg/file-search.svg");
+        folderOpenIcon = loadIcon("/icons/svg/folder-open.svg");
+        saveIcon = loadIcon("/icons/svg/device-floppy.svg");
+        infoIcon = loadIcon("/icons/svg/info-square-rounded.svg");
+        appWindowIcon = loadIcon("/icons/svg/app-window.svg");
+        validIcon = loadIcon("/icons/svg/checks.svg");
+        invalidIcon = loadIcon("/icons/svg/alert-circle.svg");
+        gamepadIcon = loadIcon("/icons/svg/device-gamepad.svg");
+        zoomInIcon = loadIcon("/icons/svg/zoom-in.svg");
+        zoomOutIcon = loadIcon("/icons/svg/zoom-out.svg");
+        reloadIcon = loadIcon("/icons/svg/refresh.svg");
+        fileImportIcon = loadIcon("/icons/svg/file-import.svg");
+        fileExportIcon = loadIcon("/icons/svg/file-export.svg");
 
-            leftIcon.setColorFilter(iconColorFilter);
-            rightIcon.setColorFilter(iconColorFilter);
-            folderSearchIcon.setColorFilter(iconColorFilter);
-            fileSearchIcon.setColorFilter(iconColorFilter);
-            folderOpenIcon.setColorFilter(iconColorFilter);
-            saveIcon.setColorFilter(iconColorFilter);
-            infoIcon.setColorFilter(iconColorFilter);
-            appWindowIcon.setColorFilter(iconColorFilter);
-            validIcon.setColorFilter(iconColorFilter);
-            invalidIcon.setColorFilter(iconColorFilter);
-            gamepadIcon.setColorFilter(iconColorFilter);
-            zoomInIcon.setColorFilter(iconColorFilter);
-            zoomOutIcon.setColorFilter(iconColorFilter);
-            reloadIcon.setColorFilter(iconColorFilter);
-            fileImportIcon.setColorFilter(iconColorFilter);
-            fileExportIcon.setColorFilter(iconColorFilter);
+        rightIcon.setColorFilter(iconColorFilter);
+        leftIcon.setColorFilter(iconColorFilter);
+        folderSearchIcon.setColorFilter(iconColorFilter);
+        fileSearchIcon.setColorFilter(iconColorFilter);
+        folderOpenIcon.setColorFilter(iconColorFilter);
+        saveIcon.setColorFilter(iconColorFilter);
+        infoIcon.setColorFilter(iconColorFilter);
+        appWindowIcon.setColorFilter(iconColorFilter);
+        validIcon.setColorFilter(iconColorFilter);
+        invalidIcon.setColorFilter(iconColorFilter);
+        gamepadIcon.setColorFilter(iconColorFilter);
+        zoomInIcon.setColorFilter(iconColorFilter);
+        zoomOutIcon.setColorFilter(iconColorFilter);
+        reloadIcon.setColorFilter(iconColorFilter);
+        fileImportIcon.setColorFilter(iconColorFilter);
+        fileExportIcon.setColorFilter(iconColorFilter);
+    }
+
+    /**
+     * Loads a SVG icon from the provided resource path
+     * @param resourcePath a <code>String</code> containing the path of the icon resource
+     * @return a <code>FlatSVGIcon</code>
+     * @throws ToolAttributeModificationException if the resource is missing or could not be read
+     */
+    private static FlatSVGIcon loadIcon(String resourcePath)
+    {
+        try (InputStream stream = ToolFrame.class.getResourceAsStream(resourcePath)) {
+            if (stream == null)
+                throw new ToolAttributeModificationException("Missing icon resource: " + resourcePath);
+            return new FlatSVGIcon(stream);
         }
-        catch(IOException e) {
-            throw new RuntimeException(e);
+        catch (IOException e) {
+            throw new ToolAttributeModificationException("An error occurred while reading the icon resource: " + resourcePath, e);
         }
     }
 
@@ -198,7 +212,7 @@ public class ThemeUtils
         }
         else
         {
-            Tool.preferences.put("laf", null);
+            Tool.preferences.remove("laf");
         }
     }
 

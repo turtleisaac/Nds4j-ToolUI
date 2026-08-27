@@ -43,7 +43,7 @@ public class ProjectStartPanel extends JPanel {
     }
 
     private void changeLanguageButtonPressed(ActionEvent e) {
-        Locale.setDefault(Locale.FRANCE);
+        tool.changeLocale();
         ResourceBundle bundle = ResourceBundle.getBundle("project_gui");
 
         button1.setText(bundle.getString("ProjectStartPanel.button1.text"));
@@ -88,22 +88,34 @@ public class ProjectStartPanel extends JPanel {
 
     private void prepareForToolWindowStart(String projectPath)
     {
-        projectOpened = true;
-        this.projectPath = projectPath;
         ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode info = null;
+
         try {
-            projectInfo = (ObjectNode) objectMapper.readTree(new String(Buffer.readFile(Paths.get(projectPath, FileUtils.projectFileName)), StandardCharsets.UTF_8));
+            info = (ObjectNode) objectMapper.readTree(new String(Buffer.readFile(Paths.get(projectPath, FileUtils.projectFileName)), StandardCharsets.UTF_8));
         }
         catch (JsonProcessingException e) {
-            JOptionPane.showMessageDialog(this, "A fatal error occurred while reading data:\n" + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            throw new RuntimeException(e);
-        } catch(ClassCastException ignored) {
-        } finally {
-            if (projectInfo == null)
-            {
-                projectInfo = objectMapper.createObjectNode();
-            }
+            JOptionPane.showMessageDialog(this, "The " + FileUtils.projectFileName + " in this folder could not be read:\n" + e.getMessage(), "Invalid Project", JOptionPane.ERROR_MESSAGE);
+            return;
         }
+        catch (ClassCastException ignored) {
+            // the Projectfile does not contain a JSON object, so start from an empty one
+        }
+        catch (RuntimeException e) {
+            // Buffer.readFile wraps a missing or unreadable file in a RuntimeException
+            JOptionPane.showMessageDialog(this, "This folder is not a project - no " + FileUtils.projectFileName + " could be read from it.", "Invalid Project", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (info == null)
+        {
+            info = objectMapper.createObjectNode();
+        }
+
+        // only consider the project opened once its info has been successfully materialized
+        this.projectInfo = info;
+        this.projectPath = projectPath;
+        projectOpened = true;
         tool.getProjectStartFrame().dispose();
     }
 

@@ -38,8 +38,8 @@ public class HexadecimalSpinner extends JSpinner
         {
             try {
                 if (text.startsWith("0x"))
-                    return (int) Long.parseLong(text.substring(2), 16);
-                return (int) Long.parseLong(text);
+                    return Integer.parseUnsignedInt(text.substring(2), 16);
+                return Integer.parseInt(text);
             } catch (NumberFormatException nfe) {
                 throw new ParseException(text,0);
             }
@@ -47,7 +47,9 @@ public class HexadecimalSpinner extends JSpinner
 
         public String valueToString(Object value)
         {
-            return "0x" + Long.toHexString((Integer) value).toUpperCase();
+            if (value == null)
+                return "";
+            return "0x" + Integer.toHexString(((Number) value).intValue()).toUpperCase();
         }
     }
 }

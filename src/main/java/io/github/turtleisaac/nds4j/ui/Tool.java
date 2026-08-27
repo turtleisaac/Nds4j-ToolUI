@@ -1139,6 +1139,20 @@ public class Tool {
     }
 
     /**
+     * Reports a failure from a background thread.
+     * <p>A modal dialog blocks whichever thread shows it, and these are raised while the git worker still holds
+     * gitLock - showing one inline would hold the lock for as long as the dialog is up, so every save in the
+     * meantime would be refused and the window could not be closed. Hand it to the event dispatch thread
+     * instead.</p>
+     */
+    private void showFromWorker(String message, String title)
+    {
+        if (toolFrame == null)
+            return;
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(toolFrame, message, title, JOptionPane.ERROR_MESSAGE));
+    }
+
+    /**
      * Gets whether a commit has been scheduled and has not yet finished
      * @return a <code>boolean</code>
      */
@@ -1207,13 +1221,11 @@ public class Tool {
                 gitEnabled = false;
             }
             catch (IOException e) {
-                JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "ROM Write Failed", JOptionPane.ERROR_MESSAGE);
+                showFromWorker(e.getMessage(), "ROM Write Failed");
                 throw new RuntimeException(e);
             }
             catch (GitAPIException e) {
-                if (toolFrame != null) {
-                    JOptionPane.showMessageDialog(toolFrame, e.getMessage(), "Git Commit Failed", JOptionPane.ERROR_MESSAGE);
-                }
+                showFromWorker(e.getMessage(), "Git Commit Failed");
                 throw new RuntimeException(e);
             }
             finally {

@@ -1228,13 +1228,33 @@ public class Tool {
                 showFromWorker(e.getMessage(), "Git Commit Failed");
                 throw new RuntimeException(e);
             }
+            catch (RuntimeException e) {
+                // JGit throws unchecked for configuration it will not accept - a signing format it
+                // has no signer for, a hook it cannot run. Uncaught on this thread that arrived as
+                // "an unexpected error occurred" with nothing tying it to the backup, while the
+                // save it followed had in fact succeeded. Say which failed. Error is deliberately
+                // not caught: an OutOfMemoryError is not this worker's to swallow, unlike the
+                // project-creation thread, which is the last thing running at that point.
+                showFromWorker("Your changes have been saved to disk, but the backup commit could "
+                        + "not be created:\n" + e, "Backup Commit Failed");
+            }
             finally {
                 gitLock.unlock();
                 commitPending.set(false);
             }
         });
 
-        gitThread.start();
+        try {
+            gitThread.start();
+        }
+        catch (RuntimeException | Error e) {
+            // The slot is claimed before the worker exists, so nothing else releases it if the
+            // worker never runs - and the flag is the only thing standing between the user and
+            // "no backup commit was created" on every save for the rest of the session.
+            commitPending.set(false);
+            gitThread = null;
+            throw e;
+        }
 
         return true;
     }

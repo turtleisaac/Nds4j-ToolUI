@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "dryer": "66ff6d21a42c04afcad89c78a80066176d1294b0",
+  "threshold": 0.82,
+  "pairs": [
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/FileUtils.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.FileUtils",
+        "name": "getProjectfilePath",
+        "body": "120772aac527943a",
+        "start": 78,
+        "end": 81
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/FileUtils.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.FileUtils",
+        "name": "getProjectUnpackedRomPath",
+        "body": "8fbdb1f1967c5366",
+        "start": 88,
+        "end": 91
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/PanelManager.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.PanelManager.PanelGroup",
+        "name": "setContainer",
+        "body": "2d9c495940bc4cd7",
+        "start": 293,
+        "end": 296
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setGit",
+        "body": "aaadf9c94f32a483",
+        "start": 768,
+        "end": 771
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/PanelManager.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.PanelManager.PanelGroup",
+        "name": "setContainer",
+        "body": "2d9c495940bc4cd7",
+        "start": 293,
+        "end": 296
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setGitThread",
+        "body": "0060e525710e191b",
+        "start": 773,
+        "end": 776
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ProjectStartPanel.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ProjectStartPanel",
+        "name": "removeThemeButton",
+        "body": "7514d02a1fdcd3f5",
+        "start": 298,
+        "end": 305
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ProjectStartPanel.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ProjectStartPanel",
+        "name": "removeLanguageButton",
+        "body": "16eca16813313ca2",
+        "start": 311,
+        "end": 318
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ThemeUtils.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ThemeUtils",
+        "name": "addLookAndFeel",
+        "body": "48552207920eb179",
+        "start": 239,
+        "end": 242
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "addMenuToBar",
+        "body": "f77db4485de7fd4c",
+        "start": 130,
+        "end": 133
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setType",
+        "body": "09190939422aa52b",
+        "start": 141,
+        "end": 146
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setName",
+        "body": "414bdbcfacda0014",
+        "start": 154,
+        "end": 159
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setType",
+        "body": "09190939422aa52b",
+        "start": 141,
+        "end": 146
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setVersion",
+        "body": "3d5695b2088dd54d",
+        "start": 167,
+        "end": 172
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setType",
+        "body": "09190939422aa52b",
+        "start": 141,
+        "end": 146
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setFlavorText",
+        "body": "9f42c7ea6276c308",
+        "start": 181,
+        "end": 186
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setType",
+        "body": "09190939422aa52b",
+        "start": 141,
+        "end": 146
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setAuthor",
+        "body": "89b8352d14fb924d",
+        "start": 194,
+        "end": 199
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setName",
+        "body": "414bdbcfacda0014",
+        "start": 154,
+        "end": 159
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setVersion",
+        "body": "3d5695b2088dd54d",
+        "start": 167,
+        "end": 172
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setName",
+        "body": "414bdbcfacda0014",
+        "start": 154,
+        "end": 159
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setFlavorText",
+        "body": "9f42c7ea6276c308",
+        "start": 181,
+        "end": 186
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setName",
+        "body": "414bdbcfacda0014",
+        "start": 154,
+        "end": 159
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setAuthor",
+        "body": "89b8352d14fb924d",
+        "start": 194,
+        "end": 199
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setVersion",
+        "body": "3d5695b2088dd54d",
+        "start": 167,
+        "end": 172
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setFlavorText",
+        "body": "9f42c7ea6276c308",
+        "start": 181,
+        "end": 186
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setVersion",
+        "body": "3d5695b2088dd54d",
+        "start": 167,
+        "end": 172
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setAuthor",
+        "body": "89b8352d14fb924d",
+        "start": 194,
+        "end": 199
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setFlavorText",
+        "body": "9f42c7ea6276c308",
+        "start": 181,
+        "end": 186
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setAuthor",
+        "body": "89b8352d14fb924d",
+        "start": 194,
+        "end": 199
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "addPanelManager",
+        "body": "142b1e2f109836c7",
+        "start": 398,
+        "end": 403
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "addFunction",
+        "body": "2db573bc2775718c",
+        "start": 413,
+        "end": 418
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setGit",
+        "body": "aaadf9c94f32a483",
+        "start": 768,
+        "end": 771
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/Tool.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.Tool",
+        "name": "setGitThread",
+        "body": "0060e525710e191b",
+        "start": 773,
+        "end": 776
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "openProjectButtonPressed",
+        "body": "89eb5636fec3135c",
+        "start": 218,
+        "end": 221
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "openRecentButtonPressed",
+        "body": "54ff7287680807dd",
+        "start": 223,
+        "end": 226
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "openProjectButtonPressed",
+        "body": "89eb5636fec3135c",
+        "start": 218,
+        "end": 221
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "importRomButtonPressed",
+        "body": "3bde1fcf1d8b64d0",
+        "start": 228,
+        "end": 231
+      }
+    },
+    {
+      "language": "java",
+      "score": 1.0,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "openRecentButtonPressed",
+        "body": "54ff7287680807dd",
+        "start": 223,
+        "end": 226
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "importRomButtonPressed",
+        "body": "3bde1fcf1d8b64d0",
+        "start": 228,
+        "end": 231
+      }
+    },
+    {
+      "language": "java",
+      "score": 0.857143,
+      "left": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ProjectCreateDialog.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ProjectCreateDialog",
+        "name": "setIcons",
+        "body": "9a8d239a409ec4a0",
+        "start": 88,
+        "end": 93
+      },
+      "right": {
+        "path": "src/main/java/io/github/turtleisaac/nds4j/ui/ToolFrame.java",
+        "namespace": "io.github.turtleisaac.nds4j.ui.ToolFrame",
+        "name": "setIcons",
+        "body": "1156f914b8eb87a4",
+        "start": 67,
+        "end": 76
+      }
+    }
+  ]
+}

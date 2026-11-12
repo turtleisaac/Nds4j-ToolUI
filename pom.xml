@@ -93,6 +93,65 @@
     <build>
         <plugins>
             <!--
+              Maven 3.8's default Surefire is 2.12.4, which does not run JUnit 5.
+              CI already resolves 3.5.4. Pin it so coverage is the same in both places.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+            </plugin>
+            <!-- JaCoCo instruction coverage. crapper reads target/site/jacoco/jacoco.xml. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- PIT stays off the default build. CI runs pitest:mutationCoverage. -->
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.30.2</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <targetClasses>
+                        <param>io.github.turtleisaac.nds4j.ui.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>io.github.turtleisaac.nds4j.ui.*</param>
+                    </targetTests>
+                    <outputFormats>
+                        <outputFormat>XML</outputFormat>
+                    </outputFormats>
+                    <timestampedReports>false</timestampedReports>
+                    <jvmArgs>
+                        <value>-Djava.awt.headless=true</value>
+                    </jvmArgs>
+                    <!-- An empty report is a broken run, not a pass. -->
+                    <failWhenNoMutations>true</failWhenNoMutations>
+                </configuration>
+            </plugin>
+            <!--
               Eclipse profile in config/eclipse-formatter.xml.
               ratchetFrom checks only Java files that differ from origin/main,
               so existing sources are not rewritten. CI must fetch that ref

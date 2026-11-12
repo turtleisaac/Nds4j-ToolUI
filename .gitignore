@@ -36,3 +36,11 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Quality-gate tools. Baselines under .quality/ are committed.
+.quality/py/
+__pycache__/
+*.pyc
+
+# ROMs. Never commit game files or anything derived from them.
+*.nds
